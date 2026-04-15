@@ -282,11 +282,15 @@ class SemanticScholarClient:
             'fields': 'title,abstract,authors,publicationDate,journal,doi,url,citationCount,referenceCount,externalIds,keywords'
         }
         
-        # Date filters
+        # Date filters - Semantic Scholar expects 4-digit year only
         if from_date:
-            params['year'] = f"{from_date.split('-')[0]}-"
+            year = from_date.split('-')[0]
+            if len(year) == 4 and year.isdigit():
+                params['year'] = f"{year}-"
         if to_date and not from_date:
-            params['year'] = f"-{to_date.split('-')[0]}"
+            year = to_date.split('-')[0]
+            if len(year) == 4 and year.isdigit():
+                params['year'] = f"-{year}"
         
         # Pagination
         offset = 0

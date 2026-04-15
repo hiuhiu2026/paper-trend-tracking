@@ -19,12 +19,12 @@ try:
     from .data_collector import DataCollector
     from .database import DatabaseManager
     from .keyword_extractor import create_extractor, BaseKeywordExtractor
-    from .network_builder import NetworkBuilder, TrendAnalyzer
+    from .network_builder import NetworkBuilder, TrendAnalyzer, KeywordNetworkSnapshot
 except ImportError:
     from data_collector import DataCollector
     from database import DatabaseManager
     from keyword_extractor import create_extractor, BaseKeywordExtractor
-    from network_builder import NetworkBuilder, TrendAnalyzer
+    from network_builder import NetworkBuilder, TrendAnalyzer, KeywordNetworkSnapshot
 
 
 class PaperTrendPipeline:
@@ -39,15 +39,26 @@ class PaperTrendPipeline:
     def __init__(
         self,
         config: Dict,
-        db_path: str = "data/papers.db"
+        db_path: str = "data/papers.db",
+        base_dir: str = None
     ):
         """
         Args:
             config: Configuration dictionary
-            db_path: Path to SQLite database
+            db_path: Path to SQLite database (relative to base_dir)
+            base_dir: Base directory for the project (defaults to current dir)
         """
         self.config = config
-        self.db_path = db_path
+        self.base_dir = Path(base_dir) if base_dir else Path.cwd()
+        
+        # Ensure db_path is absolute
+        db_path_obj = Path(db_path)
+        if not db_path_obj.is_absolute():
+            db_path_obj = self.base_dir / db_path_obj
+        db_path_obj.parent.mkdir(parents=True, exist_ok=True)
+        self.db_path = str(db_path_obj)
+        
+        logger.info(f"Database path: {self.db_path}")
         
         # Initialize components
         self.collector = DataCollector(
@@ -55,7 +66,7 @@ class PaperTrendPipeline:
             s2_api_key=config.get('api_keys', {}).get('semantic_scholar')
         )
         
-        self.db = DatabaseManager(f"sqlite:///{db_path}")
+        self.db = DatabaseManager(f"sqlite:///{self.db_path}")
         
         # Keyword extractor
         kw_config = config.get('keywords', {})

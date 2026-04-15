@@ -16,6 +16,7 @@ from datetime import datetime
 from typing import List, Optional, Dict, Tuple
 from dataclasses import asdict
 import json
+from pathlib import Path
 
 try:
     from .data_collector import Paper
@@ -163,6 +164,12 @@ class DatabaseManager:
     """Manages database connections and operations"""
     
     def __init__(self, db_url: str = "sqlite:///data/papers.db"):
+        # Ensure directory exists for SQLite database file
+        if db_url.startswith("sqlite:///"):
+            db_path = db_url.replace("sqlite:///", "")
+            db_file = Path(db_path)
+            db_file.parent.mkdir(parents=True, exist_ok=True)
+        
         self.engine = create_engine(db_url, echo=False)
         self.SessionLocal = sessionmaker(bind=self.engine)
         self._create_tables()
