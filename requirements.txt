@@ -17,6 +17,7 @@ sqlalchemy>=2.0.0
 # Visualization
 plotly>=5.17.0
 dash>=2.14.0
+dash-bootstrap-components>=1.5.0  # Optional, for better UI
 
 # Utilities
 pandas>=2.1.0
@@ -30,3 +31,6 @@ tqdm>=4.66.0
 
 # Optional: Advanced graph analysis
 # igraph>=0.11.0
+
+# Optional: Better dashboard UI
+# dash-bootstrap-components>=1.5.0

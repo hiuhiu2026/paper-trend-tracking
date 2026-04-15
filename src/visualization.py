@@ -220,12 +220,19 @@ class TrendDashboard:
         """Create and run Dash dashboard"""
         try:
             import dash
-            from dash import dcc, html, Input, Output, callback_context
+            from dash import Dash, dcc, html, Input, Output, callback_context, State
             from dash.exceptions import PreventUpdate
+            import dash_bootstrap_components as dbc
+            has_bootstrap = True
         except ImportError:
-            logger.error("Dash not installed. Run: pip install dash")
-            print("\n💡 Install Dash: pip install dash")
-            return
+            try:
+                from dash import Dash, dcc, html, Input, Output, callback_context, State
+                has_bootstrap = False
+            except ImportError:
+                logger.error("Dash not installed. Run: pip install dash")
+                print("\n💡 Install Dash: pip install dash plotly")
+                print("💡 Optional (better UI): pip install dash-bootstrap-components")
+                return
         
         # Initialize Dash app
         app = dash.Dash(__name__)
@@ -244,6 +251,12 @@ class TrendDashboard:
         finally:
             session.close()
         
+        # Initialize Dash app
+        if has_bootstrap:
+            app = Dash(__name__, external_stylesheets=[dbc.themes.FLATLY])
+        else:
+            app = Dash(__name__)
+        
         # Get initial data for layout
         session = self.db.get_session()
         try:
@@ -251,107 +264,82 @@ class TrendDashboard:
                 KeywordNetworkSnapshot.snapshot_date.desc()
             ).limit(10).all()
             
-            time_window_options = [{'label': 'Day', 'value': 'day'}]
-            time_window_options.extend([
-                {'label': 'Week', 'value': 'week'},
-                {'label': 'Month', 'value': 'month'},
-                {'label': 'Quarter', 'value': 'quarter'}
-            ])
+            time_window_options = [{'label': 'Day', 'value': 'day'},
+                                   {'label': 'Week', 'value': 'week'},
+                                   {'label': 'Month', 'value': 'month'},
+                                   {'label': 'Quarter', 'value': 'quarter'}]
             
             default_window = 'month'
             if snapshots:
-                # Use most common time window from existing snapshots
                 from collections import Counter
                 windows = [s.time_window for s in snapshots]
                 default_window = Counter(windows).most_common(1)[0][0]
         finally:
             session.close()
         
-        # App layout
+        # App layout - simple version without tabs (more compatible)
         app.layout = html.Div([
-            html.Div([
-                html.H1("📊 Paper Trend Tracking Dashboard", 
-                        style={'textAlign': 'center', 'marginBottom': 10, 'color': '#2c3e50'}),
-                html.P("Track research trends through keyword network evolution",
-                       style={'textAlign': 'center', 'color': '#7f8c8d', 'marginBottom': 30})
-            ], style={'backgroundColor': '#ecf0f1', 'padding': '20px', 'marginBottom': '20px'}),
+            html.H1("📊 Paper Trend Tracking Dashboard", 
+                    style={'textAlign': 'center', 'marginBottom': 10}),
+            html.P("Track research trends through keyword network evolution",
+                   style={'textAlign': 'center', 'color': '#666', 'marginBottom': 30}),
             
             # Controls
             html.Div([
                 html.Div([
-                    html.Label("⏱️ Time Window:", style={'fontWeight': 'bold'}),
+                    html.Label("Time Window:"),
                     dcc.Dropdown(
                         id='time-window-dropdown',
                         options=time_window_options,
                         value=default_window,
                         clearable=False
                     )
-                ], style={'width': '30%', 'display': 'inline-block', 'verticalAlign': 'top'}),
+                ], style={'width': '30%', 'display': 'inline-block'}),
                 
                 html.Div([
-                    html.Label("📈 Metric:", style={'fontWeight': 'bold'}),
+                    html.Label("Metric: "),
                     dcc.Dropdown(
                         id='metric-dropdown',
                         options=[
-                            {'label': '🚀 Growth Rate', 'value': 'growth_rate'},
-                            {'label': '⚡ Momentum', 'value': 'momentum'},
-                            {'label': '🎯 PageRank', 'value': 'pagerank'},
-                            {'label': '🔗 Degree', 'value': 'degree'},
-                            {'label': '🌉 Betweenness', 'value': 'betweenness'}
+                            {'label': 'Growth Rate', 'value': 'growth_rate'},
+                            {'label': 'Momentum', 'value': 'momentum'},
+                            {'label': 'PageRank', 'value': 'pagerank'},
+                            {'label': 'Degree', 'value': 'degree'},
+                            {'label': 'Betweenness', 'value': 'betweenness'}
                         ],
                         value='growth_rate',
                         clearable=False
                     )
-                ], style={'width': '30%', 'display': 'inline-block', 'marginLeft': '5%', 'verticalAlign': 'top'}),
-                
-                html.Div([
-                    html.Label("📊 Top N:", style={'fontWeight': 'bold'}),
-                    dcc.Slider(
-                        id='top-n-slider',
-                        min=10,
-                        max=100,
-                        step=10,
-                        value=30,
-                        marks={i: str(i) for i in range(10, 101, 10)}
-                    )
-                ], style={'width': '30%', 'display': 'inline-block', 'marginLeft': '5%', 'verticalAlign': 'top'})
-            ], style={'marginBottom': 30, 'padding': '20px', 'backgroundColor': '#f9f9f9', 'borderRadius': '5px'}),
+                ], style={'width': '30%', 'display': 'inline-block', 'marginLeft': '5%'})
+            ], style={'marginBottom': 30}),
             
-            # Main content in tabs
-            html.Div([
-                html.Tabs([
-                    html.Tab([
-                        html.H3("🔥 Trending Keywords", style={'marginTop': 20}),
-                        dcc.Graph(id='trend-chart', style={'height': '500px'}),
-                    ], label='📈 Trends', tab_id='trends'),
-                    
-                    html.Tab([
-                        html.H3("🕸️ Keyword Network", style={'marginTop': 20}),
-                        dcc.Graph(id='network-graph', style={'height': '700px'}),
-                        html.P("💡 Tip: Hover over nodes to see keywords, zoom with scroll wheel",
-                               style={'color': '#7f8c8d', 'textAlign': 'center', 'marginTop': 10})
-                    ], label='🕸️ Network', tab_id='network'),
-                    
-                    html.Tab([
-                        html.H3("📋 Data Table", style={'marginTop': 20}),
-                        html.Div(id='data-table')
-                    ], label='📋 Table', tab_id='table')
-                ])
-            ])
-        ], style={'fontFamily': 'Arial, sans-serif', 'margin': '0 auto', 'maxWidth': '1400px', 'padding': '20px'})
+            # Trend chart
+            html.H3("Trending Keywords"),
+            dcc.Graph(id='trend-chart', style={'height': '500px'}),
+            
+            # Network graph
+            html.H3("Keyword Network (Latest Snapshot)", style={'marginTop': 30}),
+            dcc.Graph(id='network-graph', style={'height': '600px'}),
+            
+            # Data table
+            html.H3("Trending Keywords Table", style={'marginTop': 30}),
+            html.Div(id='data-table')
+        ], style={'fontFamily': 'Arial, sans-serif', 'margin': '0 auto', 'maxWidth': '1200px', 'padding': '20px'})
         
         # Callbacks
         @app.callback(
             Output('trend-chart', 'figure'),
-            [Input('metric-dropdown', 'value')]
+            Input('metric-dropdown', 'value')
         )
         def update_trend_chart(metric):
             trends = self.trend_analyzer.get_trending_keywords(limit=30)
+            if not trends:
+                return go.Figure(layout=go.Layout(title="No data available"))
             return self.visualizer.plot_trend_evolution(trends, metric=metric, save=False)
         
         @app.callback(
             Output('network-graph', 'figure'),
-            [Input('time-window-dropdown', 'value')]
+            Input('time-window-dropdown', 'value')
         )
         def update_network(time_window):
             # Get latest snapshot
@@ -362,7 +350,7 @@ class TrendDashboard:
                 ).order_by(KeywordNetworkSnapshot.snapshot_date.desc()).first()
                 
                 if not latest:
-                    return go.Figure(layout=go.Layout(title="No data available"))
+                    return go.Figure(layout=go.Layout(title="No network data available"))
                 
                 snapshot = self.network_builder._load_snapshot(latest)
                 return self.visualizer.plot_network(snapshot.graph, save=False)
@@ -371,10 +359,13 @@ class TrendDashboard:
         
         @app.callback(
             Output('data-table', 'children'),
-            [Input('metric-dropdown', 'value')]
+            Input('metric-dropdown', 'value')
         )
         def update_table(metric):
-            trends = self.trend_analyzer.get_trending_keywords(limit=20)
+            trends = self.trend_analyzer.get_trending_keywords(limit=50)
+            
+            if not trends:
+                return html.P("No trend data available")
             
             table = html.Table([
                 html.Thead([
@@ -396,13 +387,21 @@ class TrendDashboard:
                     ])
                     for i, trend in enumerate(trends)
                 ])
-            ])
+            ], style={'width': '100%', 'borderCollapse': 'collapse'})
+            
+            # Add styling
+            for row in table.children[1].children:
+                for cell in row.children:
+                    cell.style['padding'] = '8px'
+                    cell.style['border'] = '1px solid #ddd'
             
             return table
         
         # Run server
         logger.info(f"Starting dashboard on http://localhost:{port}")
-        app.run_server(port=port, debug=debug)
+        print(f"\n✅ Dashboard ready at: http://localhost:{port}")
+        print(f"   Press Ctrl+C to stop\n")
+        app.run_server(host='0.0.0.0', port=port, debug=debug)
 
 
 def create_visualizations(db_path: str = "data/papers.db"):
