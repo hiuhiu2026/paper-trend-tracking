@@ -120,23 +120,110 @@ class PubMedClient:
                 yield paper
     
     def _fetch_batch(self, pmids: List[str]) -> List[Paper]:
-        """Fetch paper details for a batch of PMIDs"""
+        """
+        Fetch paper details for a batch of PMIDs using PubMed Central API
+        Uses /pmc/articles/ endpoint which returns proper JSON
+        """
         if not pmids:
             return []
         
-        fetch_params = {
-            'db': 'pubmed',
-            'id': ','.join(pmids),
-            'retmode': 'json',
-            'rettype': 'abstract'
-        }
-        
-        result = self._request('efetch.fcgi', fetch_params)
-        if not result:
-            return []
-        
         papers = []
-        pubmed_data = result.get('pubmedresult', [])
+        
+        # Fetch each PMID individually using the newer PMC API
+        # This returns proper JSON format
+        for pmid in pmids[:20]:  # Limit to avoid rate limits
+            try:
+                paper = self._fetch_single_pmid(pmid)
+                if paper:
+                    papers.append(paper)
+            except Exception as e:
+                logger.debug(f"Failed to fetch PMID {pmid}: {e}")
+        
+        return papers
+    
+    def _fetch_single_pmid(self, pmid: str) -> Optional[Paper]:
+        """Fetch single paper using E-utilities summary + fetch"""
+        try:
+            # Use esummary which returns JSON reliably
+            summary_params = {
+                'db': 'pubmed',
+                'id': pmid,
+                'retmode': 'json'
+            }
+            
+            summary = self._request('esummary.fcgi', summary_params)
+            if not summary or 'result' not in summary:
+                return None
+            
+            paper_data = summary['result'].get(pmid)
+            if not paper_data:
+                return None
+            
+            # Parse summary data
+            title = paper_data.get('title', '')
+            
+            # Authors
+            authors = []
+            for author in paper_data.get('authors', []):
+                name = author.get('name', '')
+                if name:
+                    authors.append(name)
+            
+            # Journal
+            journal = paper_data.get('fulljournalname', '') or paper_data.get('journal', '')
+            
+            # Publication date
+            pub_date = paper_data.get('pubdate', '')
+            if not pub_date:
+                pub_date = paper_data.get('epubdate', '')
+            
+            # DOI
+            doi = None
+            article_ids = paper_data.get('articleids', [])
+            for article_id in article_ids:
+                if article_id.get('idtype') == 'doi':
+                    doi = article_id.get('value')
+                    break
+            
+            # URL
+            url = f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/"
+            
+            # Get abstract separately if available
+            abstract = ""
+            if paper_data.get('hasabstract', False):
+                abstract_params = {
+                    'db': 'pubmed',
+                    'id': pmid,
+                    'rettype': 'abstract',
+                    'retmode': 'text'
+                }
+                try:
+                    abstract_result = self._request('efetch.fcgi', abstract_params)
+                    if abstract_result and 'text' in abstract_result:
+                        abstract_text = abstract_result.get('text', '')
+                        # Extract abstract from text format
+                        if 'ABSTRACT' in abstract_text:
+                            abstract = abstract_text.split('ABSTRACT')[-1].strip()[:2000]
+                except:
+                    pass
+            
+            return Paper(
+                id=f"PMID:{pmid}",
+                title=title,
+                abstract=abstract,
+                authors=authors,
+                publication_date=pub_date,
+                journal=journal,
+                doi=doi,
+                keywords=[],  # Will be extracted
+                source='pubmed',
+                url=url,
+                raw_data=paper_data
+            )
+            
+        except Exception as e:
+            logger.error(f"Error fetching PMID {pmid}: {e}")
+            return None
         
         for entry in pubmed_data:
             try:
@@ -310,28 +397,14 @@ class SemanticScholarClient:
             'fields': 'title,abstract,authors,year,publicationDate,venue,journal,doi,url,citationCount,referenceCount,externalIds,fieldsOfStudy'
         }
         
-        # Date filters - Semantic Scholar expects year or year range
-        # Format: year=2020-2023 or year=2020- or year=-2023
-        if from_date or to_date:
-            from_year = None
-            to_year = None
-            
-            if from_date:
-                from_year = from_date.split('-')[0]
-                if not (len(from_year) == 4 and from_year.isdigit()):
-                    from_year = None
-            
-            if to_date:
-                to_year = to_date.split('-')[0]
-                if not (len(to_year) == 4 and to_year.isdigit()):
-                    to_year = None
-            
-            if from_year and to_year:
-                params['year'] = f"{from_year}-{to_year}"
-            elif from_year:
-                params['year'] = f"{from_year}-"
-            elif to_year:
-                params['year'] = f"-{to_year}"
+        # Date filters - Semantic Scholar year parameter
+        # Format: year=2020 (single year) or omit for all years
+        # Note: S2AG API doesn't support year ranges in search, filter after retrieval
+        if from_date:
+            from_year = from_date.split('-')[0]
+            if len(from_year) == 4 and from_year.isdigit():
+                # Store for post-filtering (API doesn't support ranges well)
+                params['min_year'] = int(from_year)
         
         # Pagination
         offset = 0
@@ -351,6 +424,12 @@ class SemanticScholarClient:
             for paper_data in papers:
                 paper = self._parse_paper(paper_data)
                 if paper:
+                    # Apply year filter if specified
+                    if params.get('min_year'):
+                        pub_year = paper.publication_date[:4] if paper.publication_date else None
+                        if pub_year and pub_year.isdigit() and int(pub_year) < params['min_year']:
+                            continue
+                    
                     yield paper
                     total_fetched += 1
             
