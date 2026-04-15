@@ -13,7 +13,8 @@ collection:
   # Recommended sources (no API key required)
   default_sources:
     - pubmed      # Biomedical literature (PubMed Central)
-    - arxiv       # Preprints (CS, Physics, Quant Bio)
+    - arxiv       # Preprints (CS, Physics, Math, Quant Bio)
+    - biorxiv     # Biology preprints (genetics, neuroscience, etc.)
   
   # Optional: Semantic Scholar (requires API key for good rate limits)
   # - semanticscholar

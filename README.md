@@ -21,7 +21,8 @@ flowchart LR
 
 ✅ **Data Collection**
 - PubMed E-utilities API (biomedical literature)
-- arXiv API (preprints - CS, Physics, Quantitative Biology)
+- arXiv API (preprints - CS, Physics, Math, Quantitative Biology)
+- bioRxiv API (biology preprints - genetics, neuroscience, cancer, etc.)
 - Semantic Scholar (optional, requires API key)
 - Unified collector with cross-source deduplication
 
@@ -192,13 +193,19 @@ clusters = pipeline.get_emerging_clusters()
 
 ### Run Interactive Dashboard
 
-```python
-from src.visualization import TrendDashboard
+```bash
+# Start dashboard server
+python -c "from src.visualization import TrendDashboard; TrendDashboard().create_dashboard(port=8050)"
 
-dashboard = TrendDashboard("data/papers.db")
-dashboard.create_dashboard(port=8050)
-# Open http://localhost:8050
+# Open in browser: http://localhost:8050
 ```
+
+**Dashboard Features:**
+- 📈 Real-time trend charts with multiple metrics
+- 🕸️ Interactive keyword network visualization
+- 📋 Exportable data table
+- ⏱️ Filter by time window (day/week/month/quarter)
+- 🎛️ Adjustable top-N slider
 
 ### Generate Static Visualizations
 
@@ -228,13 +235,14 @@ python -c "from src.visualization import create_visualizations; create_visualiza
 
 ## API Rate Limits
 
-| Source | Rate Limit | API Key Required |
-|--------|-----------|------------------|
-| PubMed | 3-10 req/sec | Optional (recommended) |
-| arXiv | ~6 req/sec | No |
-| Semantic Scholar | 100 req/sec | Yes (free) |
+| Source | Rate Limit | API Key Required | Content |
+|--------|-----------|------------------|---------|
+| PubMed | 3-10 req/sec | Optional | Biomedical literature |
+| arXiv | ~6 req/sec | No | CS, Physics, Math, Quant Bio |
+| bioRxiv | ~2 req/sec | No | Biology preprints |
+| Semantic Scholar | 100 req/sec | Yes (free) | All fields |
 
-**Default configuration uses PubMed + arXiv (no API keys required)**
+**Default configuration: PubMed + arXiv + bioRxiv (no API keys required)**
 
 Get API keys (optional):
 - **PubMed**: https://www.ncbi.nlm.nih.gov/account/ (increases limit to 10 req/sec)

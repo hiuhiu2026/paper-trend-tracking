@@ -195,10 +195,23 @@ class NetworkVisualizer:
 class TrendDashboard:
     """
     Interactive Plotly Dash dashboard for trend exploration
+    
+    Features:
+    - Real-time trend charts
+    - Keyword network visualization
+    - Filter by time window and metric
+    - Data table with export
     """
     
-    def __init__(self, db_path: str = "data/papers.db"):
-        self.db = DatabaseManager(f"sqlite:///{db_path}")
+    def __init__(self, db_path: str = "data/papers.db", base_dir: str = None):
+        # Ensure db_path is absolute
+        from pathlib import Path
+        self.base_dir = Path(base_dir) if base_dir else Path.cwd()
+        db_path_obj = Path(db_path)
+        if not db_path_obj.is_absolute():
+            db_path_obj = self.base_dir / db_path_obj
+        
+        self.db = DatabaseManager(f"sqlite:///{db_path_obj}")
         self.network_builder = NetworkBuilder(self.db)
         self.trend_analyzer = TrendAnalyzer(self.db)
         self.visualizer = NetworkVisualizer()
@@ -207,9 +220,11 @@ class TrendDashboard:
         """Create and run Dash dashboard"""
         try:
             import dash
-            from dash import dcc, html, Input, Output, callback
+            from dash import dcc, html, Input, Output, callback_context
+            from dash.exceptions import PreventUpdate
         except ImportError:
             logger.error("Dash not installed. Run: pip install dash")
+            print("\n💡 Install Dash: pip install dash")
             return
         
         # Initialize Dash app
@@ -229,53 +244,101 @@ class TrendDashboard:
         finally:
             session.close()
         
+        # Get initial data for layout
+        session = self.db.get_session()
+        try:
+            snapshots = session.query(KeywordNetworkSnapshot).order_by(
+                KeywordNetworkSnapshot.snapshot_date.desc()
+            ).limit(10).all()
+            
+            time_window_options = [{'label': 'Day', 'value': 'day'}]
+            time_window_options.extend([
+                {'label': 'Week', 'value': 'week'},
+                {'label': 'Month', 'value': 'month'},
+                {'label': 'Quarter', 'value': 'quarter'}
+            ])
+            
+            default_window = 'month'
+            if snapshots:
+                # Use most common time window from existing snapshots
+                from collections import Counter
+                windows = [s.time_window for s in snapshots]
+                default_window = Counter(windows).most_common(1)[0][0]
+        finally:
+            session.close()
+        
         # App layout
         app.layout = html.Div([
-            html.H1("📊 Paper Trend Tracking Dashboard", 
-                    style={'textAlign': 'center', 'marginBottom': 30}),
+            html.Div([
+                html.H1("📊 Paper Trend Tracking Dashboard", 
+                        style={'textAlign': 'center', 'marginBottom': 10, 'color': '#2c3e50'}),
+                html.P("Track research trends through keyword network evolution",
+                       style={'textAlign': 'center', 'color': '#7f8c8d', 'marginBottom': 30})
+            ], style={'backgroundColor': '#ecf0f1', 'padding': '20px', 'marginBottom': '20px'}),
             
             # Controls
             html.Div([
                 html.Div([
-                    html.Label("Time Window:"),
+                    html.Label("⏱️ Time Window:", style={'fontWeight': 'bold'}),
                     dcc.Dropdown(
                         id='time-window-dropdown',
-                        options=[
-                            {'label': 'Week', 'value': 'week'},
-                            {'label': 'Month', 'value': 'month'},
-                            {'label': 'Quarter', 'value': 'quarter'}
-                        ],
-                        value='month'
+                        options=time_window_options,
+                        value=default_window,
+                        clearable=False
                     )
-                ], style={'width': '30%', 'display': 'inline-block'}),
+                ], style={'width': '30%', 'display': 'inline-block', 'verticalAlign': 'top'}),
                 
                 html.Div([
-                    html.Label("Metric:"),
+                    html.Label("📈 Metric:", style={'fontWeight': 'bold'}),
                     dcc.Dropdown(
                         id='metric-dropdown',
                         options=[
-                            {'label': 'Growth Rate', 'value': 'growth_rate'},
-                            {'label': 'Momentum', 'value': 'momentum'},
-                            {'label': 'PageRank', 'value': 'pagerank'},
-                            {'label': 'Degree', 'value': 'degree'},
-                            {'label': 'Betweenness', 'value': 'betweenness'}
+                            {'label': '🚀 Growth Rate', 'value': 'growth_rate'},
+                            {'label': '⚡ Momentum', 'value': 'momentum'},
+                            {'label': '🎯 PageRank', 'value': 'pagerank'},
+                            {'label': '🔗 Degree', 'value': 'degree'},
+                            {'label': '🌉 Betweenness', 'value': 'betweenness'}
                         ],
-                        value='growth_rate'
+                        value='growth_rate',
+                        clearable=False
                     )
-                ], style={'width': '30%', 'display': 'inline-block', 'marginLeft': '5%'})
-            ], style={'marginBottom': 20}),
+                ], style={'width': '30%', 'display': 'inline-block', 'marginLeft': '5%', 'verticalAlign': 'top'}),
+                
+                html.Div([
+                    html.Label("📊 Top N:", style={'fontWeight': 'bold'}),
+                    dcc.Slider(
+                        id='top-n-slider',
+                        min=10,
+                        max=100,
+                        step=10,
+                        value=30,
+                        marks={i: str(i) for i in range(10, 101, 10)}
+                    )
+                ], style={'width': '30%', 'display': 'inline-block', 'marginLeft': '5%', 'verticalAlign': 'top'})
+            ], style={'marginBottom': 30, 'padding': '20px', 'backgroundColor': '#f9f9f9', 'borderRadius': '5px'}),
             
-            # Trend chart
-            dcc.Graph(id='trend-chart'),
-            
-            # Network graph
-            html.H3("Keyword Network (Latest Snapshot)", style={'marginTop': 30}),
-            dcc.Graph(id='network-graph'),
-            
-            # Data table
-            html.H3("Trending Keywords", style={'marginTop': 30}),
-            html.Div(id='data-table')
-        ])
+            # Main content in tabs
+            html.Div([
+                html.Tabs([
+                    html.Tab([
+                        html.H3("🔥 Trending Keywords", style={'marginTop': 20}),
+                        dcc.Graph(id='trend-chart', style={'height': '500px'}),
+                    ], label='📈 Trends', tab_id='trends'),
+                    
+                    html.Tab([
+                        html.H3("🕸️ Keyword Network", style={'marginTop': 20}),
+                        dcc.Graph(id='network-graph', style={'height': '700px'}),
+                        html.P("💡 Tip: Hover over nodes to see keywords, zoom with scroll wheel",
+                               style={'color': '#7f8c8d', 'textAlign': 'center', 'marginTop': 10})
+                    ], label='🕸️ Network', tab_id='network'),
+                    
+                    html.Tab([
+                        html.H3("📋 Data Table", style={'marginTop': 20}),
+                        html.Div(id='data-table')
+                    ], label='📋 Table', tab_id='table')
+                ])
+            ])
+        ], style={'fontFamily': 'Arial, sans-serif', 'margin': '0 auto', 'maxWidth': '1400px', 'padding': '20px'})
         
         # Callbacks
         @app.callback(

@@ -16,8 +16,10 @@ import json
 
 try:
     from .arxiv_client import ArxivClient, ArxivToPaperAdapter
+    from .biorxiv_client import BiorxivClient, BiorxivToPaperAdapter
 except ImportError:
     from arxiv_client import ArxivClient, ArxivToPaperAdapter
+    from biorxiv_client import BiorxivClient, BiorxivToPaperAdapter
 
 
 @dataclass
@@ -546,8 +548,9 @@ class DataCollector:
     
     Supported sources:
     - PubMed (biomedical literature)
-    - arXiv (preprints, especially CS, Physics, Quant Bio)
-    - Semantic Scholar (optional, requires API key for good rate limits)
+    - arXiv (preprints - CS, Physics, Math, Quant Bio)
+    - bioRxiv (biology preprints)
+    - Semantic Scholar (optional, requires API key)
     """
     
     def __init__(
@@ -555,18 +558,23 @@ class DataCollector:
         pubmed_api_key: Optional[str] = None,
         s2_api_key: Optional[str] = None,
         use_arxiv: bool = True,
+        use_biorxiv: bool = True,
         use_semantic_scholar: bool = False
     ):
         self.pubmed = PubMedClient(api_key=pubmed_api_key)
         self.arxiv = ArxivClient() if use_arxiv else None
+        self.biorxiv = BiorxivClient() if use_biorxiv else None
         self.semantic_scholar = SemanticScholarClient(api_key=s2_api_key) if use_semantic_scholar else None
         
         self.use_arxiv = use_arxiv
+        self.use_biorxiv = use_biorxiv
         self.use_semantic_scholar = use_semantic_scholar
         
         sources = ['PubMed']
         if use_arxiv:
             sources.append('arXiv')
+        if use_biorxiv:
+            sources.append('bioRxiv')
         if use_semantic_scholar:
             sources.append('Semantic Scholar')
         
@@ -585,15 +593,15 @@ class DataCollector:
         
         Args:
             query: Search query
-            sources: List of sources ('pubmed', 'arxiv', 'semanticscholar')
-                     Defaults to ['pubmed', 'arxiv'] if None
+            sources: List of sources ('pubmed', 'arxiv', 'biorxiv', 'semanticscholar')
+                     Defaults to ['pubmed', 'arxiv', 'biorxiv'] if None
             from_date: Start date (YYYY-MM-DD)
             to_date: End date (YYYY-MM-DD)
             max_per_source: Max papers per source
         """
-        # Default sources: PubMed + arXiv (no API key needed)
+        # Default sources: PubMed + arXiv + bioRxiv (no API keys needed)
         if sources is None:
-            sources = ['pubmed', 'arxiv']
+            sources = ['pubmed', 'arxiv', 'biorxiv']
             if self.use_semantic_scholar:
                 sources.append('semanticscholar')
         
@@ -621,6 +629,20 @@ class DataCollector:
                     seen_ids.add(std_paper.id)
                     yield std_paper
         
+        # bioRxiv
+        if 'biorxiv' in sources and self.biorxiv:
+            logger.info(f"Collecting from bioRxiv: {query}")
+            
+            # Map query to bioRxiv categories
+            categories = self._infer_biorxiv_categories(query)
+            
+            for paper in self.biorxiv.search(query, from_date, to_date, max_per_source, categories):
+                # Convert to standard format
+                std_paper = BiorxivToPaperAdapter.to_standard(paper)
+                if std_paper.id not in seen_ids:
+                    seen_ids.add(std_paper.id)
+                    yield std_paper
+        
         # Semantic Scholar (optional, requires API key)
         if 'semanticscholar' in sources and self.semantic_scholar:
             logger.info(f"Collecting from Semantic Scholar: {query}")
@@ -630,6 +652,56 @@ class DataCollector:
                     yield paper
         
         logger.info(f"Collection complete: {len(seen_ids)} unique papers")
+    
+    def _infer_biorxiv_categories(self, query: str) -> List[str]:
+        """
+        Infer relevant bioRxiv categories from query
+        
+        Common categories:
+        - bioinformatics, bioengineering, biophysics
+        - cancer_biology, cell_biology, clinical_trials
+        - developmental_biology, ecology, epidemiology
+        - genetics, genomics, immunology
+        - microbiology, molecular_biology, neuroscience
+        - pharmacology, physiology, synthetic_biology
+        """
+        query_lower = query.lower()
+        
+        categories = []
+        
+        # Genetics/Genomics
+        if any(word in query_lower for word in ['gene', 'genom', 'crispr', 'mutation', 'dna', 'rna']):
+            categories.extend(['genetics', 'genomics', 'molecular_biology'])
+        
+        # Cancer
+        if any(word in query_lower for word in ['cancer', 'tumor', 'oncolog', 'carcinoma']):
+            categories.append('cancer_biology')
+        
+        # Neuroscience
+        if any(word in query_lower for word in ['neural', 'brain', 'neuron', 'cognitive']):
+            categories.append('neuroscience')
+        
+        # Drug/Pharma
+        if any(word in query_lower for word in ['drug', 'pharma', 'therapeutic', 'compound']):
+            categories.extend(['pharmacology', 'molecular_biology'])
+        
+        # Cell biology
+        if any(word in query_lower for word in ['cell', 'protein', 'signaling', 'pathway']):
+            categories.extend(['cell_biology', 'molecular_biology'])
+        
+        # Clinical
+        if any(word in query_lower for word in ['clinical', 'patient', 'trial', 'cohort']):
+            categories.append('clinical_trials')
+        
+        # Microbiology/Immunology
+        if any(word in query_lower for word in ['virus', 'bacteria', 'immune', 'antibody']):
+            categories.extend(['microbiology', 'immunology'])
+        
+        # Default to molecular biology if nothing specific
+        if not categories:
+            categories = ['molecular_biology', 'genetics']
+        
+        return list(set(categories))  # Remove duplicates
     
     def _infer_arxiv_categories(self, query: str) -> List[str]:
         """
