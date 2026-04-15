@@ -17,8 +17,12 @@ from typing import List, Dict, Tuple, Optional
 from pathlib import Path
 from loguru import logger
 
-from .database import DatabaseManager
-from .network_builder import NetworkBuilder, TrendAnalyzer
+try:
+    from .database import DatabaseManager
+    from .network_builder import NetworkBuilder, TrendAnalyzer, KeywordNetworkSnapshot
+except ImportError:
+    from database import DatabaseManager
+    from network_builder import NetworkBuilder, TrendAnalyzer, KeywordNetworkSnapshot
 
 
 class NetworkVisualizer:
@@ -82,9 +86,8 @@ class NetworkVisualizer:
                 size=node_sizes,
                 colorbar=dict(
                     thickness=15,
-                    title='Degree',
+                    title=dict(text='Degree', side='right'),
                     xanchor='left',
-                    titleside='right'
                 ),
                 line_width=2
             ),

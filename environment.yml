@@ -20,5 +20,5 @@ dependencies:
     - yake>=0.4.8
     - spacy>=3.7.0
     - habanero>=1.2.0
-    - semantic-scholar>=0.7.0
+    - semanticscholar>=0.7.0
     - dash>=2.14.0

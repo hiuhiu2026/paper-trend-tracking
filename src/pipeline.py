@@ -15,10 +15,16 @@ from typing import List, Dict, Optional
 from loguru import logger
 import yaml
 
-from .data_collector import DataCollector
-from .database import DatabaseManager
-from .keyword_extractor import create_extractor, BaseKeywordExtractor
-from .network_builder import NetworkBuilder, TrendAnalyzer
+try:
+    from .data_collector import DataCollector
+    from .database import DatabaseManager
+    from .keyword_extractor import create_extractor, BaseKeywordExtractor
+    from .network_builder import NetworkBuilder, TrendAnalyzer
+except ImportError:
+    from data_collector import DataCollector
+    from database import DatabaseManager
+    from keyword_extractor import create_extractor, BaseKeywordExtractor
+    from network_builder import NetworkBuilder, TrendAnalyzer
 
 
 class PaperTrendPipeline:
@@ -276,7 +282,10 @@ class PaperTrendPipeline:
         # Get latest snapshot
         session = self.db.get_session()
         try:
-            from .network_builder import NetworkBuilder
+            try:
+                from .network_builder import NetworkBuilder
+            except ImportError:
+                from network_builder import NetworkBuilder
             builder = NetworkBuilder(self.db)
             
             latest_snapshot = session.query(KeywordNetworkSnapshot).order_by(

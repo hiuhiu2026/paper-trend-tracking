@@ -252,6 +252,10 @@ class SemanticScholarClient:
             return response.json()
             
         except requests.RequestException as e:
+            if '429' in str(e):
+                logger.warning(f"Semantic Scholar API rate limit hit. Waiting 60 seconds...")
+                time.sleep(60)
+                return self._request(endpoint, params)  # Retry once
             logger.error(f"Semantic Scholar API error: {e}")
             return None
     

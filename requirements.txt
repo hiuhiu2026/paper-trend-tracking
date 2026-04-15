@@ -1,7 +1,7 @@
 # API Clients
 requests>=2.31.0
 habanero>=1.2.0
-semantic-scholar>=0.7.0
+semanticscholar>=0.7.0
 
 # NLP & Keyword Extraction
 spacy>=3.7.0

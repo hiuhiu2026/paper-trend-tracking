@@ -16,8 +16,11 @@ from datetime import datetime, timedelta
 from loguru import logger
 
 # Add src to path
-sys.path.insert(0, str(Path(__file__).parent / 'src'))
+src_path = str(Path(__file__).parent / 'src')
+if src_path not in sys.path:
+    sys.path.insert(0, src_path)
 
+# Import from src package
 from pipeline import PaperTrendPipeline
 
 

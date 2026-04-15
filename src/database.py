@@ -17,7 +17,10 @@ from typing import List, Optional, Dict, Tuple
 from dataclasses import asdict
 import json
 
-from .data_collector import Paper
+try:
+    from .data_collector import Paper
+except ImportError:
+    from data_collector import Paper
 
 
 Base = declarative_base()
@@ -215,7 +218,7 @@ class DatabaseManager:
                         session.add(keyword)
                     
                     # Update statistics
-                    keyword.total_occurrences += 1
+                    keyword.total_occurrences = (keyword.total_occurrences or 0) + 1
                     keyword.last_seen = datetime.utcnow()
                     
                     # Link paper and keyword
@@ -273,7 +276,7 @@ class DatabaseManager:
                         )
                         session.add(keyword)
                     
-                    keyword.total_occurrences += 1
+                    keyword.total_occurrences = (keyword.total_occurrences or 0) + 1
                     keyword.last_seen = datetime.utcnow()
                     paper_model.keywords.append(keyword)
                 

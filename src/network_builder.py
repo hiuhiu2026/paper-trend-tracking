@@ -21,7 +21,10 @@ from collections import defaultdict, Counter
 from loguru import logger
 import json
 
-from .database import DatabaseManager, PaperModel, KeywordModel, KeywordNetworkSnapshot, TrendMetrics
+try:
+    from .database import DatabaseManager, PaperModel, KeywordModel, KeywordNetworkSnapshot, TrendMetrics
+except ImportError:
+    from database import DatabaseManager, PaperModel, KeywordModel, KeywordNetworkSnapshot, TrendMetrics
 
 
 @dataclass
@@ -388,12 +391,12 @@ class TrendAnalyzer:
                     
                     # Calculate growth rate (compare to previous snapshot)
                     growth_rate = self._calculate_growth_rate(
-                        session, kw_id, snapshot.snapshot_date, occurrence_count
+                        session, kw_id, snapshot.end_date, occurrence_count
                     )
                     
                     # Calculate momentum (acceleration)
                     momentum = self._calculate_momentum(
-                        session, kw_id, snapshot.snapshot_date, growth_rate
+                        session, kw_id, snapshot.end_date, growth_rate
                     )
                     
                     # Save metrics
