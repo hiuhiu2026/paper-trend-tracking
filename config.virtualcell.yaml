@@ -1,0 +1,38 @@
+# Virtual Cell Literature Tracker Configuration
+
+# API Keys (optional)
+api_keys:
+  pubmed: null  # https://www.ncbi.nlm.nih.gov/account/
+
+# LLM Configuration (optional, for auto-summaries)
+llm:
+  enabled: false
+  provider: openai
+  model: gpt-4o-mini
+  api_key: null  # https://platform.openai.com/api-keys
+
+# Collection Settings
+collection:
+  days_back: 3  # Collect papers from last N days
+  max_per_query: 50  # Max papers per search query
+  
+  # Virtual Cell specific queries
+  # Edit these to customize your focus
+  queries:
+    - "virtual cell modeling"
+    - "digital twin cell"
+    - "whole cell simulation"
+    - "AI virtual cell"
+    - "machine learning cell model"
+
+# Output Settings
+output:
+  directory: output
+  filename_pattern: "virtual-cell-{date}.md"
+  save_latest: true  # Also save as virtual-cell-latest.md
+
+# Filtering
+filtering:
+  min_relevance_score: 0.5  # Minimum score to include paper
+  include_methodology: true  # Include AI/ML/modeling papers
+  include_biology: true  # Include biology-focused papers
