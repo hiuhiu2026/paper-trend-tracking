@@ -1,0 +1,113 @@
+# Paper Trend Tracking Configuration
+# Copy this file to config.yaml and fill in your API keys
+
+# API Keys (optional but recommended for higher rate limits)
+api_keys:
+  pubmed: null  # NCBI API key (optional, increases rate limit from 3 to 10 req/sec)
+  semantic_scholar: null  # Semantic Scholar API key (optional, for higher tier access)
+
+# Data Collection
+collection:
+  default_sources:
+    - pubmed
+    - semanticscholar
+  max_papers_per_query: 500
+  batch_size: 100
+  
+  # Default search queries to track (add your research areas)
+  tracked_queries:
+    - "machine learning drug discovery"
+    - "deep learning protein structure"
+    - "AI clinical trials"
+    - "natural language processing biomedical"
+  
+  # Date range for initial collection
+  from_date: "2020-01-01"
+  to_date: null  # null = current date
+  
+  # Collection frequency (for scheduled runs)
+  schedule: "0 2 * * *"  # Daily at 2 AM
+
+# Database
+database:
+  type: "sqlite"
+  path: "./data/papers.db"
+  
+  # For PostgreSQL (uncomment and configure if needed)
+  # type: "postgresql"
+  # host: "localhost"
+  # port: 5432
+  # database: "paper_trends"
+  # user: "your_user"
+  # password: "your_password"
+
+# Keyword Extraction
+keywords:
+  # Extraction method: 'tfidf', 'yake', 'llm', 'mesh' (PubMed MeSH only), 'hybrid'
+  method: "yake"
+  
+  # YAKE settings
+  yake:
+    language: "en"
+    max_ngram_size: 3
+    num_keywords: 10
+    dedup_threshold: 0.9
+  
+  # TF-IDF settings
+  tfidf:
+    max_features: 10000
+    min_df: 2
+    max_df: 0.8
+    ngram_range: [1, 3]
+  
+  # LLM settings (if using LLM extraction)
+  llm:
+    provider: "openai"  # or "anthropic"
+    model: "gpt-4o-mini"
+    api_key: null  # Set your API key or use env var
+    max_keywords: 10
+  
+  # Hybrid settings (combine multiple methods)
+  hybrid:
+    extractors:
+      - method: "yake"
+        weight: 0.7
+      - method: "mesh"
+        weight: 0.3
+  
+  # Keyword normalization
+  normalize: true
+  synonym_file: "./data/synonyms.json"  # Optional synonym mapping
+  
+  # Filtering
+  min_score: 0.1  # Minimum score threshold
+  exclude_patterns:  # Regex patterns to exclude
+    - "^supplementary"
+    - "^additional"
+
+# Network Analysis
+network:
+  # Time window for network slices
+  time_window: "month"  # 'week', 'month', 'quarter'
+  
+  # Edge creation: keywords co-occurring in same paper
+  min_cooccurrence: 2
+  
+  # Metrics to track
+  metrics:
+    - degree
+    - betweenness
+    - pagerank
+    - clustering
+
+# Visualization
+visualization:
+  dashboard_port: 8050
+  default_time_range: 365  # days
+  max_nodes_display: 500
+
+# Logging
+logging:
+  level: "INFO"
+  file: "./logs/paper_trends.log"
+  rotation: "10 MB"
