@@ -260,20 +260,41 @@ class TrendDashboard:
         # Get initial data for layout
         session = self.db.get_session()
         try:
-            snapshots = session.query(KeywordNetworkSnapshot).order_by(
-                KeywordNetworkSnapshot.snapshot_date.desc()
-            ).limit(10).all()
+            # Check if tables exist and have data
+            from sqlalchemy import inspect
+            inspector = inspect(session.bind)
+            tables = inspector.get_table_names()
             
-            time_window_options = [{'label': 'Day', 'value': 'day'},
-                                   {'label': 'Week', 'value': 'week'},
-                                   {'label': 'Month', 'value': 'month'},
-                                   {'label': 'Quarter', 'value': 'quarter'}]
+            logger.info(f"Dashboard database tables: {tables}")
             
+            if 'keyword_network_snapshots' in tables:
+                snapshots = session.query(KeywordNetworkSnapshot).order_by(
+                    KeywordNetworkSnapshot.snapshot_date.desc()
+                ).limit(10).all()
+                
+                logger.info(f"Found {len(snapshots)} snapshots")
+                
+                time_window_options = [{'label': 'Day', 'value': 'day'},
+                                       {'label': 'Week', 'value': 'week'},
+                                       {'label': 'Month', 'value': 'month'},
+                                       {'label': 'Quarter', 'value': 'quarter'}]
+                
+                default_window = 'month'
+                if snapshots:
+                    from collections import Counter
+                    windows = [s.time_window for s in snapshots]
+                    default_window = Counter(windows).most_common(1)[0][0]
+                    logger.info(f"Default time window: {default_window}")
+            else:
+                logger.warning("No keyword_network_snapshots table found")
+                snapshots = []
+                default_window = 'month'
+                time_window_options = [{'label': 'Month', 'value': 'month'}]
+        except Exception as e:
+            logger.error(f"Error loading dashboard data: {e}")
+            snapshots = []
             default_window = 'month'
-            if snapshots:
-                from collections import Counter
-                windows = [s.time_window for s in snapshots]
-                default_window = Counter(windows).most_common(1)[0][0]
+            time_window_options = [{'label': 'Month', 'value': 'month'}]
         finally:
             session.close()
         
@@ -332,10 +353,25 @@ class TrendDashboard:
             Input('metric-dropdown', 'value')
         )
         def update_trend_chart(metric):
-            trends = self.trend_analyzer.get_trending_keywords(limit=30)
-            if not trends:
-                return go.Figure(layout=go.Layout(title="No data available"))
-            return self.visualizer.plot_trend_evolution(trends, metric=metric, save=False)
+            try:
+                trends = self.trend_analyzer.get_trending_keywords(limit=30)
+                if not trends:
+                    # Try to get any data
+                    logger.debug("No trends found, showing empty chart")
+                    return go.Figure(layout=go.Layout(
+                        title="No trend data available - Run pipeline first",
+                        xaxis={'visible': False},
+                        yaxis={'visible': False},
+                        annotations=[{
+                            'text': "Run: python run_virtualcell.py",
+                            'xref': 'paper', 'yref': 'paper',
+                            'showarrow': False, 'font': {'size': 14}
+                        }]
+                    ))
+                return self.visualizer.plot_trend_evolution(trends, metric=metric, save=False)
+            except Exception as e:
+                logger.error(f"Error updating trend chart: {e}")
+                return go.Figure(layout=go.Layout(title=f"Error: {e}"))
         
         @app.callback(
             Output('network-graph', 'figure'),
@@ -345,15 +381,44 @@ class TrendDashboard:
             # Get latest snapshot
             session = self.db.get_session()
             try:
-                latest = session.query(KeywordNetworkSnapshot).filter(
+                # Try to get any snapshot first
+                latest = session.query(KeywordNetworkSnapshot).order_by(
+                    KeywordNetworkSnapshot.snapshot_date.desc()
+                ).first()
+                
+                if not latest:
+                    logger.debug("No network snapshots found")
+                    return go.Figure(layout=go.Layout(
+                        title="No network data available - Run pipeline first",
+                        xaxis={'visible': False},
+                        yaxis={'visible': False},
+                        annotations=[{
+                            'text': "Run: python run_virtualcell.py --network",
+                            'xref': 'paper', 'yref': 'paper',
+                            'showarrow': False, 'font': {'size': 14}
+                        }]
+                    ))
+                
+                # Try to get snapshot with selected time window
+                snapshot_data = session.query(KeywordNetworkSnapshot).filter(
                     KeywordNetworkSnapshot.time_window == time_window
                 ).order_by(KeywordNetworkSnapshot.snapshot_date.desc()).first()
                 
-                if not latest:
-                    return go.Figure(layout=go.Layout(title="No network data available"))
+                # Fallback to any snapshot if time window not found
+                if not snapshot_data:
+                    logger.debug(f"No snapshots for {time_window}, using latest")
+                    snapshot_data = latest
                 
-                snapshot = self.network_builder._load_snapshot(latest)
-                return self.visualizer.plot_network(snapshot.graph, save=False)
+                snapshot = self.network_builder._load_snapshot(snapshot_data)
+                
+                if snapshot and snapshot.num_nodes > 0:
+                    return self.visualizer.plot_network(snapshot.graph, save=False)
+                else:
+                    return go.Figure(layout=go.Layout(title="Empty network"))
+                    
+            except Exception as e:
+                logger.error(f"Error updating network: {e}")
+                return go.Figure(layout=go.Layout(title=f"Error: {e}"))
             finally:
                 session.close()
         
@@ -362,12 +427,17 @@ class TrendDashboard:
             Input('metric-dropdown', 'value')
         )
         def update_table(metric):
-            trends = self.trend_analyzer.get_trending_keywords(limit=50)
-            
-            if not trends:
-                return html.P("No trend data available")
-            
-            table = html.Table([
+            try:
+                trends = self.trend_analyzer.get_trending_keywords(limit=50)
+                
+                if not trends:
+                    return html.Div([
+                        html.P("No trend data available", style={'color': '#666'}),
+                        html.P("Run the pipeline first:", style={'color': '#999', 'fontSize': '12px'}),
+                        html.Code("python run_virtualcell.py", style={'backgroundColor': '#f4f4f4', 'padding': '5px'})
+                    ], style={'padding': '20px', 'textAlign': 'center'})
+                
+                table = html.Table([
                 html.Thead([
                     html.Tr([
                         html.Th("Rank"),

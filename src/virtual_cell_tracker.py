@@ -27,10 +27,18 @@ src_path = Path(__file__).parent / 'src'
 if str(src_path) not in sys.path:
     sys.path.insert(0, str(src_path))
 
-from data_collector import DataCollector, Paper
-from keyword_extractor import create_extractor
-from network_builder import NetworkBuilder, TrendAnalyzer
-from visualization import NetworkVisualizer, TrendDashboard
+try:
+    from .data_collector import DataCollector, Paper
+    from .keyword_extractor import create_extractor
+    from .network_builder import NetworkBuilder, TrendAnalyzer
+    from .visualization import NetworkVisualizer, TrendDashboard
+    from .database import DatabaseManager, PaperModel, KeywordModel
+except ImportError:
+    from data_collector import DataCollector, Paper
+    from keyword_extractor import create_extractor
+    from network_builder import NetworkBuilder, TrendAnalyzer
+    from visualization import NetworkVisualizer, TrendDashboard
+    from database import DatabaseManager, PaperModel, KeywordModel
 
 
 # ============================================================================

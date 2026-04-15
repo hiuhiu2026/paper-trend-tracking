@@ -195,9 +195,13 @@ from deepseek import DeepSeek
 
 ```
 output/
-├── virtual-cell-2026-04-15.md  # Daily report
+├── virtual-cell-2026-04-15.md      # Daily report with network analysis
 ├── virtual-cell-2026-04-16.md
-└── virtual-cell-latest.md      # Latest report symlink
+├── virtual-cell-latest.md          # Latest report
+├── virtual_cell_papers.db          # SQLite database for dashboard
+└── vc_visualizations/
+    ├── network_*.html              # Keyword network graph
+    └── trends_*.html               # Trend charts
 ```
 
 ## Automation
@@ -307,8 +311,15 @@ python src/virtual_cell_tracker.py --days 7 --output weekly-report.md
 | Focus | General research trends | Virtual Cell specific |
 | Filtering | Keyword-based | Domain-specific rules |
 | Summaries | None | LLM-powered (optional) |
-| Output | Network graphs, trends | Daily markdown report |
+| Output | Dashboard + Network + Trends | Report + Network + Dashboard |
+| Dashboard | General trends | Virtual Cell specific |
 | Automation | Manual | Cron-ready |
+
+**Both now include:**
+- ✅ Network analysis
+- ✅ Interactive dashboard
+- ✅ Trend detection
+- ✅ Visualization charts
 
 ## License
 
