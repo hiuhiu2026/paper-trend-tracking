@@ -14,7 +14,7 @@ collection:
     - pubmed
     - semanticscholar
   max_papers_per_query: 500
-  batch_size: 100
+  batch_size: 20  # Reduced batch size for PubMed API compatibility
   
   # Default search queries to track (add your research areas)
   tracked_queries:
