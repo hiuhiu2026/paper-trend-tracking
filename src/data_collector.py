@@ -222,18 +222,37 @@ class PubMedClient:
 
 
 class SemanticScholarClient:
-    """Semantic Scholar Academic Graph API client"""
+    """
+    Semantic Scholar Academic Graph API v1 client
+    
+    API Documentation: https://api.semanticscholar.org/api-docs/graph
+    """
     
     BASE_URL = "https://api.semanticscholar.org/graph/v1"
-    RATE_LIMIT_DELAY = 0.1  # 10 requests per second for free tier
+    RATE_LIMIT_DELAY = 1.0  # Conservative: 1 request per second to avoid 429
+    
+    # Valid fields according to S2AG API
+    VALID_FIELDS = [
+        'title', 'abstract', 'authors', 'year', 'publicationDate', 'publicationTypes',
+        'journal', 'venue', 'doi', 'url', 'citationCount', 'referenceCount',
+        'influentialCitationCount', 'isOpenAccess', 'externalIds', 'fieldsOfStudy',
+        's2FieldsOfStudy', 'tldr', 'embedding', 'openAccessPdf', 'citationStyles'
+    ]
     
     def __init__(self, api_key: Optional[str] = None):
         self.api_key = api_key
         self.session = requests.Session()
         self.last_request_time = 0
         
+        # Add user agent header (required by some APIs)
+        self.session.headers.update({
+            'User-Agent': 'PaperTrendTracker/1.0',
+        })
+        
         if api_key:
             self.session.headers.update({'x-api-key': api_key})
+        else:
+            logger.info("Semantic Scholar client initialized without API key (rate limited)")
     
     def _rate_limit(self):
         """Enforce rate limits"""
@@ -252,11 +271,16 @@ class SemanticScholarClient:
             return response.json()
             
         except requests.RequestException as e:
-            if '429' in str(e):
+            status_code = getattr(e.response, 'status_code', None) if hasattr(e, 'response') else None
+            
+            if status_code == 429:
                 logger.warning(f"Semantic Scholar API rate limit hit. Waiting 60 seconds...")
                 time.sleep(60)
                 return self._request(endpoint, params)  # Retry once
-            logger.error(f"Semantic Scholar API error: {e}")
+            elif status_code == 400:
+                logger.error(f"Semantic Scholar API bad request: {e}. Check parameters.")
+            else:
+                logger.error(f"Semantic Scholar API error (status {status_code}): {e}")
             return None
     
     def search(
@@ -267,30 +291,47 @@ class SemanticScholarClient:
         max_results: int = 100
     ) -> Generator[Paper, None, None]:
         """
-        Search Semantic Scholar for papers
+        Search Semantic Scholar for papers using /graph/v1/paper/search
         
         Args:
             query: Search query
             from_date: Start date (YYYY-MM-DD)
             to_date: End date (YYYY-MM-DD)
             max_results: Maximum papers to retrieve
+        
+        Returns:
+            Generator of Paper objects
         """
-        # Build query parameters
+        # Build query parameters according to S2AG API spec
+        # Core fields only to avoid 400 errors
         params = {
             'query': query,
-            'limit': min(max_results, 100),
-            'fields': 'title,abstract,authors,publicationDate,journal,doi,url,citationCount,referenceCount,externalIds,keywords'
+            'limit': min(max_results, 100),  # Max 100 per request
+            'fields': 'title,abstract,authors,year,publicationDate,venue,journal,doi,url,citationCount,referenceCount,externalIds,fieldsOfStudy'
         }
         
-        # Date filters - Semantic Scholar expects 4-digit year only
-        if from_date:
-            year = from_date.split('-')[0]
-            if len(year) == 4 and year.isdigit():
-                params['year'] = f"{year}-"
-        if to_date and not from_date:
-            year = to_date.split('-')[0]
-            if len(year) == 4 and year.isdigit():
-                params['year'] = f"-{year}"
+        # Date filters - Semantic Scholar expects year or year range
+        # Format: year=2020-2023 or year=2020- or year=-2023
+        if from_date or to_date:
+            from_year = None
+            to_year = None
+            
+            if from_date:
+                from_year = from_date.split('-')[0]
+                if not (len(from_year) == 4 and from_year.isdigit()):
+                    from_year = None
+            
+            if to_date:
+                to_year = to_date.split('-')[0]
+                if not (len(to_year) == 4 and to_year.isdigit()):
+                    to_year = None
+            
+            if from_year and to_year:
+                params['year'] = f"{from_year}-{to_year}"
+            elif from_year:
+                params['year'] = f"{from_year}-"
+            elif to_year:
+                params['year'] = f"-{to_year}"
         
         # Pagination
         offset = 0
@@ -321,52 +362,91 @@ class SemanticScholarClient:
             offset += len(papers)
     
     def _parse_paper(self, data: Dict) -> Optional[Paper]:
-        """Parse Semantic Scholar paper into standardized format"""
+        """
+        Parse Semantic Scholar paper into standardized format
+        
+        S2AG API Response Fields:
+        https://semanticscholar.readthedocs.io/en/stable/s2objects/Paper.html
+        """
         try:
+            # Paper ID - primary identifier
             paper_id = data.get('paperId', '')
-            title = data.get('title', '')
+            if not paper_id:
+                return None
+            
+            # Basic info
+            title = data.get('title', '') or ''
             abstract = data.get('abstract', '') or ''
             
-            # Authors
+            # Authors - array of {authorId, name}
             authors = []
             for author in data.get('authors', []):
-                name = author.get('name', '')
+                if isinstance(author, dict):
+                    name = author.get('name', '')
+                else:
+                    name = str(author)
                 if name:
                     authors.append(name)
             
-            # Publication date
-            pub_date = data.get('publicationDate', '')
+            # Publication date - can be string or null
+            pub_date = data.get('publicationDate', '') or ''
             
-            # Journal
-            journal = ""
+            # Year (fallback if publicationDate missing)
+            if not pub_date:
+                year = data.get('year', None)
+                if year:
+                    pub_date = str(year)
+            
+            # Journal/Venue - prefer venue, fallback to journal.name
+            venue = data.get('venue', '') or ''
+            journal = venue
             journal_data = data.get('journal', {})
-            if journal_data:
-                journal = journal_data.get('name', '')
+            if journal_data and isinstance(journal_data, dict):
+                journal_name = journal_data.get('name', '')
+                if journal_name:
+                    journal = journal_name
             
-            # DOI
+            # DOI from externalIds or direct doi field
             doi = data.get('doi', None)
+            if not doi:
+                external_ids = data.get('externalIds', {})
+                if external_ids and isinstance(external_ids, dict):
+                    doi = external_ids.get('DOI', None)
             
-            # Keywords (if available)
-            keywords = data.get('keywords', []) or []
+            # Fields of study (use as keywords if no explicit keywords)
+            keywords = []
+            fields_of_study = data.get('fieldsOfStudy', [])
+            if fields_of_study and isinstance(fields_of_study, list):
+                keywords.extend(fields_of_study)
+            
+            s2_fields = data.get('s2FieldsOfStudy', [])
+            if s2_fields and isinstance(s2_fields, list):
+                for field in s2_fields:
+                    if isinstance(field, dict):
+                        category = field.get('category', '')
+                        if category and category not in keywords:
+                            keywords.append(category)
             
             # Citation/reference counts
             citations = data.get('citationCount', None)
             references = data.get('referenceCount', None)
             
-            # URL
-            url = data.get('url', f"https://www.semanticscholar.org/paper/{paper_id}")
+            # URL - construct if not provided
+            url = data.get('url', None)
+            if not url and paper_id:
+                url = f"https://www.semanticscholar.org/paper/{paper_id}"
             
             return Paper(
                 id=f"S2:{paper_id}",
                 title=title,
                 abstract=abstract,
                 authors=authors,
-                publication_date=pub_date,
-                journal=journal,
+                publication_date=str(pub_date) if pub_date else '',
+                journal=journal or '',
                 doi=doi,
                 keywords=keywords,
                 source='semanticscholar',
-                url=url,
+                url=url or '',
                 citations_count=citations,
                 references_count=references,
                 raw_data=data
