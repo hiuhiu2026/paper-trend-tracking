@@ -489,6 +489,19 @@ Keep it concise and professional."""
                     logger.debug(f"Paper already exists: {paper.id}")
                     continue
                 
+                # Extract keywords if paper doesn't have any
+                keywords_to_add = list(paper.keywords) if paper.keywords else []
+                
+                # If no keywords from source, extract from title/abstract
+                if not keywords_to_add and (paper.title or paper.abstract):
+                    try:
+                        text = f"{paper.title}. {paper.abstract}"
+                        extracted = self.extractor.extract(text, max_keywords=10)
+                        keywords_to_add = [kw.keyword for kw in extracted]
+                        logger.debug(f"Extracted {len(keywords_to_add)} keywords for {paper.id}")
+                    except Exception as e:
+                        logger.debug(f"Keyword extraction failed for {paper.id}: {e}")
+                
                 # Create paper model
                 paper_model = PaperModel(
                     id=paper.id,
@@ -503,8 +516,8 @@ Keep it concise and professional."""
                     collected_at=dt.utcnow()
                 )
                 
-                # Add keywords
-                for kw in paper.keywords:
+                # Add keywords to database
+                for kw in keywords_to_add:
                     keyword = session.query(KeywordModel).filter(
                         KeywordModel.name == kw
                     ).first()
@@ -523,12 +536,20 @@ Keep it concise and professional."""
                     paper_model.keywords.append(keyword)
                 
                 session.add(paper_model)
+                logger.debug(f"Added paper {paper.id} with {len(keywords_to_add)} keywords")
             
             session.commit()
+            logger.info(f"Inserted {len(papers)} papers with keywords into database")
+            
+            # Verify keywords were added
+            keyword_count = session.query(KeywordModel).count()
+            logger.info(f"Total keywords in database: {keyword_count}")
             
         except Exception as e:
             session.rollback()
             logger.error(f"Error inserting papers: {e}")
+            import traceback
+            traceback.print_exc()
             return None, None, None
         finally:
             session.close()
