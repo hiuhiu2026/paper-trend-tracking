@@ -1,0 +1,24 @@
+name: paper-trends
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11
+  - pip
+  - numpy
+  - pandas
+  - scipy
+  - scikit-learn
+  - networkx
+  - plotly
+  - sqlalchemy
+  - pyyaml
+  - loguru
+  - requests
+  - tqdm
+  - pip:
+    - yake>=0.4.8
+    - spacy>=3.7.0
+    - habanero>=1.2.0
+    - semantic-scholar>=0.7.0
+    - dash>=2.14.0

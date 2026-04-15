@@ -2,11 +2,23 @@
 
 ## 5-Minute Setup
 
-### Step 1: Install Dependencies
+### Step 1: Install Dependencies (Conda)
 
 ```bash
 cd /home/admin/.openclaw/workspace/projects/paper-trend-tracking
+conda env create -f environment.yml
+conda activate paper-trends
+python -m spacy download en_core_web_sm
+```
+
+### Step 1: Install Dependencies (Pip)
+
+```bash
+cd /home/admin/.openclaw/workspace/projects/paper-trend-tracking
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install -r requirements.txt
+python -m spacy download en_core_web_sm
 ```
 
 ### Step 2: Test Keyword Extraction (No API Keys Needed)
@@ -70,7 +82,10 @@ ls -la output/visualizations/
 
 ### "Module not found"
 ```bash
+conda activate paper-trends
 pip install -r requirements.txt
+# or
+conda env update -f environment.yml
 ```
 
 ### "spaCy model not found"
@@ -80,6 +95,7 @@ python -m spacy download en_core_web_sm
 
 ### "YAKE not installed"
 ```bash
+conda activate paper-trends
 pip install yake
 ```
 

@@ -44,24 +44,53 @@ flowchart LR
 
 ## Quick Start
 
+### Installation (Conda - Recommended)
+
 ```bash
 cd paper-trend-tracking
 
-# 1. Install dependencies
+# 1. Create conda environment
+conda env create -f environment.yml
+
+# 2. Activate environment
+conda activate paper-trends
+
+# 3. Download spaCy model
+python -m spacy download en_core_web_sm
+```
+
+### Installation (Pip)
+
+```bash
+cd paper-trend-tracking
+
+# 1. Create virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# 2. Install dependencies
 pip install -r requirements.txt
 
-# 2. Configure (optional - works without API keys)
-cp config.example.yaml config.yaml
-# Edit config.yaml with your API keys and tracked queries
+# 3. Download spaCy model
+python -m spacy download en_core_web_sm
+```
 
-# 3. Run the pipeline
+### Run the Pipeline
+
+```bash
+# Configure (optional - works without API keys)
+cp config.example.yaml config.yaml
+
+# Run pipeline
 python run_pipeline.py
 
-# 4. View results
+# View results
 # - Database: data/papers.db
 # - Visualizations: output/visualizations/
 # - Logs: logs/pipeline.log
 ```
+
+See [INSTALL.md](INSTALL.md) for detailed installation instructions.
 
 ## Project Structure
 

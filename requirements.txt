@@ -1,24 +1,18 @@
 # API Clients
 requests>=2.31.0
-habanero>=1.2.0  # CrossRef API
-semantic-scholar>=0.7.0  # Semantic Scholar API
+habanero>=1.2.0
+semantic-scholar>=0.7.0
 
 # NLP & Keyword Extraction
 spacy>=3.7.0
 yake>=0.4.8
 scikit-learn>=1.3.0
 
-# LLM-based extraction (optional)
-openai>=1.0.0
-anthropic>=0.18.0
-
 # Graph Analysis
 networkx>=3.1
-igraph>=0.11.0
 
 # Data Storage
 sqlalchemy>=2.0.0
-sqlite-utils>=3.35
 
 # Visualization
 plotly>=5.17.0
@@ -26,6 +20,13 @@ dash>=2.14.0
 
 # Utilities
 pandas>=2.1.0
-python-dateutil>=2.8.2
-tqdm>=4.66.0
+pyyaml>=6.0
 loguru>=0.7.0
+tqdm>=4.66.0
+
+# Optional: LLM-based extraction
+# openai>=1.0.0
+# anthropic>=0.18.0
+
+# Optional: Advanced graph analysis
+# igraph>=0.11.0
