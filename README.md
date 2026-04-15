@@ -1,6 +1,10 @@
 # Paper Trend Tracking
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 Track and predict research trends by analyzing keyword network evolution over time.
+
+**Repository:** [github.com/hiuhiu2026/paper-trend-tracking](https://github.com/hiuhiu2026/paper-trend-tracking)
 
 ## Core Idea
 
