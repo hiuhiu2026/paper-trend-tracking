@@ -28,17 +28,20 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Collect last 3 days, build network
+  # Collect last 3 days with network analysis (default)
   python run_virtualcell.py
   
   # Collect last week, launch dashboard
   python run_virtualcell.py --days 7 --dashboard
   
-  # Quick report only (no network)
+  # Quick report only (skip network building)
   python run_virtualcell.py --days 1 --no-network
   
   # Full analysis with custom time window
   python run_virtualcell.py --days 14 --time-window month --dashboard
+  
+  # Dashboard only (using existing database)
+  python run_virtualcell.py --dashboard
         """
     )
     

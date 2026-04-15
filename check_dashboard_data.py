@@ -14,7 +14,8 @@ db_path = Path("output/virtual_cell_papers.db")
 if not db_path.exists():
     print(f"❌ Database not found: {db_path}")
     print("\n💡 Solution: Run the tracker first")
-    print("   python run_virtualcell.py --days 3 --network")
+    print("   python run_virtualcell.py --days 3")
+    print("   (Network is built by default)")
     sys.exit(1)
 
 print(f"✅ Database found: {db_path}")
@@ -83,8 +84,8 @@ if paper_count == 0:
 elif snapshot_count == 0:
     print("⚠️  Papers exist but no network snapshots")
     print("\n💡 Solution:")
-    print("   Run with --network flag:")
-    print("   python run_virtualcell.py --days 3 --network")
+    print("   python run_virtualcell.py --days 3")
+    print("   (Network is built by default)")
 else:
     print("✅ Database looks good!")
     print("\n🚀 Launch dashboard:")

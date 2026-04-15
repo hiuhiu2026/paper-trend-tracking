@@ -473,6 +473,22 @@ Keep it concise and professional."""
             for vp in papers:
                 paper = vp.paper
                 
+                # Check if paper already exists (by DOI or ID)
+                existing = None
+                if paper.doi:
+                    existing = session.query(PaperModel).filter(
+                        PaperModel.doi == paper.doi
+                    ).first()
+                
+                if not existing:
+                    existing = session.query(PaperModel).filter(
+                        PaperModel.id == paper.id
+                    ).first()
+                
+                if existing:
+                    logger.debug(f"Paper already exists: {paper.id}")
+                    continue
+                
                 # Create paper model
                 paper_model = PaperModel(
                     id=paper.id,
@@ -545,18 +561,30 @@ Keep it concise and professional."""
         visualizer = NetworkVisualizer(str(self.output_dir / "vc_visualizations"))
         
         # Generate network graph
-        if snapshots:
+        if snapshots and snapshots[-1].num_nodes > 0:
             latest_snapshot = snapshots[-1]
-            visualizer.plot_network(
-                latest_snapshot.graph,
-                title="Virtual Cell Keyword Network",
-                top_n=50,
-                save=True
-            )
+            try:
+                network_file = visualizer.plot_network(
+                    latest_snapshot.graph,
+                    title="Virtual Cell Keyword Network",
+                    top_n=min(50, latest_snapshot.num_nodes),
+                    save=True
+                )
+                logger.info(f"Network saved: {network_file}")
+            except Exception as e:
+                logger.error(f"Error generating network: {e}")
         
         # Generate trend charts
         if trends:
-            visualizer.plot_trend_evolution(trends, metric='growth_rate', top_n=30, save=True)
+            try:
+                for metric in ['growth_rate', 'momentum', 'pagerank', 'degree']:
+                    chart_file = visualizer.plot_trend_evolution(
+                        trends, metric=metric, top_n=30, save=True
+                    )
+                    logger.debug(f"Trend chart saved: {chart_file}")
+                logger.info(f"Trend charts saved to: {visualizer.output_dir}")
+            except Exception as e:
+                logger.error(f"Error generating trend charts: {e}")
         
         return snapshots, trends, visualizer
     

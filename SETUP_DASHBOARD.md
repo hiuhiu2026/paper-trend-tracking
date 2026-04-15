@@ -12,15 +12,18 @@ The dashboard shows "No data available" because the database hasn't been created
 cd paper-trend-tracking
 source venv/bin/activate
 
-# 1. Collect papers + Build network + Launch dashboard
-python run_virtualcell.py --days 3 --dashboard
+# 1. Collect papers + Build network (default)
+python run_virtualcell.py --days 3
+
+# 2. Launch dashboard
+python run_virtualcell.py --dashboard
 ```
 
 ### Step by Step
 
 ```bash
-# Step 1: Collect papers and build network
-python run_virtualcell.py --days 3 --network
+# Step 1: Collect papers and build network (network is built by default)
+python run_virtualcell.py --days 3
 
 # Expected output:
 # ✅ Report saved: output/virtual-cell-2026-04-15.md
@@ -62,7 +65,8 @@ python check_dashboard_data.py
 
 **Solution:**
 ```bash
-python run_virtualcell.py --days 3 --network
+python run_virtualcell.py --days 3
+# Network is built by default
 ```
 
 ### Issue 2: No papers in database
@@ -85,8 +89,8 @@ python run_virtualcell.py --days 7 --max 100
 
 **Solution:**
 ```bash
-# Make sure --network flag is included
-python run_virtualcell.py --days 3 --network
+# Network is built by default, just run:
+python run_virtualcell.py --days 3
 ```
 
 ### Issue 4: Dashboard shows empty charts
@@ -111,8 +115,8 @@ python run_virtualcell.py --dashboard
 # 1. Setup environment
 conda activate paper-trends
 
-# 2. Run collection and analysis
-python run_virtualcell.py --days 3 --network
+# 2. Run collection and analysis (network built by default)
+python run_virtualcell.py --days 3
 
 # 3. Check database
 python check_dashboard_data.py
@@ -126,10 +130,10 @@ python run_virtualcell.py --dashboard
 ## Automation
 
 ```bash
-# Daily update at 8 AM
+# Daily update at 8 AM (network built by default)
 0 8 * * * cd /path/to/paper-trend-tracking && \
     source venv/bin/activate && \
-    python run_virtualcell.py --days 1 --network
+    python run_virtualcell.py --days 1
 
 # Dashboard runs continuously (separate process)
 python run_virtualcell.py --dashboard --dashboard-port 8051
