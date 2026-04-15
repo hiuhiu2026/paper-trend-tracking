@@ -20,8 +20,9 @@ flowchart LR
 ## Features
 
 ✅ **Data Collection**
-- PubMed E-utilities API with rate limiting
-- Semantic Scholar Graph API
+- PubMed E-utilities API (biomedical literature)
+- arXiv API (preprints - CS, Physics, Quantitative Biology)
+- Semantic Scholar (optional, requires API key)
 - Unified collector with cross-source deduplication
 
 ✅ **Keyword Extraction** (swappable)
@@ -227,16 +228,17 @@ python -c "from src.visualization import create_visualizations; create_visualiza
 
 ## API Rate Limits
 
-| Source | Free Tier | With API Key |
-|--------|-----------|--------------|
-| PubMed | 3 req/sec | 10 req/sec |
-| Semantic Scholar | ~1 req/sec* | 100 req/sec (request) |
+| Source | Rate Limit | API Key Required |
+|--------|-----------|------------------|
+| PubMed | 3-10 req/sec | Optional (recommended) |
+| arXiv | ~6 req/sec | No |
+| Semantic Scholar | 100 req/sec | Yes (free) |
 
-*Without API key, Semantic Scholar enforces strict rate limiting. The client uses conservative delays (1 sec/request) to avoid 429 errors. For production use, get a free API key.
+**Default configuration uses PubMed + arXiv (no API keys required)**
 
-Get API keys:
-- **PubMed**: https://www.ncbi.nlm.nih.gov/account/
-- **Semantic Scholar**: https://www.semanticscholar.org/product/api (click "Get API Key")
+Get API keys (optional):
+- **PubMed**: https://www.ncbi.nlm.nih.gov/account/ (increases limit to 10 req/sec)
+- **Semantic Scholar**: https://www.semanticscholar.org/product/api (required for access)
 
 ### Configure API Keys
 

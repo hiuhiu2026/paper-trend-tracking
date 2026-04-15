@@ -14,6 +14,11 @@ from dataclasses import dataclass, asdict
 from loguru import logger
 import json
 
+try:
+    from .arxiv_client import ArxivClient, ArxivToPaperAdapter
+except ImportError:
+    from arxiv_client import ArxivClient, ArxivToPaperAdapter
+
 
 @dataclass
 class Paper:
@@ -537,17 +542,40 @@ class SemanticScholarClient:
 
 
 class DataCollector:
-    """Unified data collector for multiple sources"""
+    """Unified data collector for multiple sources
     
-    def __init__(self, pubmed_api_key: Optional[str] = None, s2_api_key: Optional[str] = None):
+    Supported sources:
+    - PubMed (biomedical literature)
+    - arXiv (preprints, especially CS, Physics, Quant Bio)
+    - Semantic Scholar (optional, requires API key for good rate limits)
+    """
+    
+    def __init__(
+        self,
+        pubmed_api_key: Optional[str] = None,
+        s2_api_key: Optional[str] = None,
+        use_arxiv: bool = True,
+        use_semantic_scholar: bool = False
+    ):
         self.pubmed = PubMedClient(api_key=pubmed_api_key)
-        self.semantic_scholar = SemanticScholarClient(api_key=s2_api_key)
-        logger.info("Data collector initialized")
+        self.arxiv = ArxivClient() if use_arxiv else None
+        self.semantic_scholar = SemanticScholarClient(api_key=s2_api_key) if use_semantic_scholar else None
+        
+        self.use_arxiv = use_arxiv
+        self.use_semantic_scholar = use_semantic_scholar
+        
+        sources = ['PubMed']
+        if use_arxiv:
+            sources.append('arXiv')
+        if use_semantic_scholar:
+            sources.append('Semantic Scholar')
+        
+        logger.info(f"Data collector initialized (sources: {', '.join(sources)})")
     
     def collect(
         self,
         query: str,
-        sources: List[str] = ['pubmed', 'semanticscholar'],
+        sources: List[str] = None,
         from_date: Optional[str] = None,
         to_date: Optional[str] = None,
         max_per_source: int = 100
@@ -557,21 +585,44 @@ class DataCollector:
         
         Args:
             query: Search query
-            sources: List of sources ('pubmed', 'semanticscholar')
-            from_date: Start date
-            to_date: End date
+            sources: List of sources ('pubmed', 'arxiv', 'semanticscholar')
+                     Defaults to ['pubmed', 'arxiv'] if None
+            from_date: Start date (YYYY-MM-DD)
+            to_date: End date (YYYY-MM-DD)
             max_per_source: Max papers per source
         """
+        # Default sources: PubMed + arXiv (no API key needed)
+        if sources is None:
+            sources = ['pubmed', 'arxiv']
+            if self.use_semantic_scholar:
+                sources.append('semanticscholar')
+        
         seen_ids = set()
         
-        if 'pubmed' in sources:
+        # PubMed
+        if 'pubmed' in sources and self.pubmed:
             logger.info(f"Collecting from PubMed: {query}")
             for paper in self.pubmed.search(query, from_date, to_date, max_per_source):
                 if paper.id not in seen_ids:
                     seen_ids.add(paper.id)
                     yield paper
         
-        if 'semanticscholar' in sources:
+        # arXiv
+        if 'arxiv' in sources and self.arxiv:
+            logger.info(f"Collecting from arXiv: {query}")
+            
+            # Map query to arXiv categories for better results
+            categories = self._infer_arxiv_categories(query)
+            
+            for paper in self.arxiv.search(query, from_date, to_date, max_per_source, categories):
+                # Convert to standard format
+                std_paper = ArxivToPaperAdapter.to_standard(paper)
+                if std_paper.id not in seen_ids:
+                    seen_ids.add(std_paper.id)
+                    yield std_paper
+        
+        # Semantic Scholar (optional, requires API key)
+        if 'semanticscholar' in sources and self.semantic_scholar:
             logger.info(f"Collecting from Semantic Scholar: {query}")
             for paper in self.semantic_scholar.search(query, from_date, to_date, max_per_source):
                 if paper.id not in seen_ids:
@@ -579,6 +630,51 @@ class DataCollector:
                     yield paper
         
         logger.info(f"Collection complete: {len(seen_ids)} unique papers")
+    
+    def _infer_arxiv_categories(self, query: str) -> List[str]:
+        """
+        Infer relevant arXiv categories from query
+        
+        Common categories:
+        - cs.LG: Machine Learning
+        - cs.AI: Artificial Intelligence
+        - cs.CL: Computation and Language (NLP)
+        - cs.CV: Computer Vision
+        - q-bio.BM: Biomolecules
+        - q-bio.GN: Genomics
+        - q-bio.QM: Quantitative Methods
+        - physics.bio-ph: Biological Physics
+        - stat.ML: Machine Learning (Statistics)
+        """
+        query_lower = query.lower()
+        
+        categories = []
+        
+        # Machine Learning / AI
+        if any(word in query_lower for word in ['machine learning', 'deep learning', 'neural', 'ai', 'artificial intelligence']):
+            categories.extend(['cs.LG', 'cs.AI', 'stat.ML'])
+        
+        # NLP / Language
+        if any(word in query_lower for word in ['language', 'text', 'nlp', 'translation']):
+            categories.append('cs.CL')
+        
+        # Computer Vision
+        if any(word in query_lower for word in ['vision', 'image', 'classification', 'detection']):
+            categories.append('cs.CV')
+        
+        # Biology / Bioinformatics
+        if any(word in query_lower for word in ['protein', 'drug', 'molecule', 'gene', 'genomics', 'bio']):
+            categories.extend(['q-bio.BM', 'q-bio.GN', 'physics.bio-ph'])
+        
+        # Clinical / Medical
+        if any(word in query_lower for word in ['clinical', 'medical', 'patient', 'trial']):
+            categories.extend(['q-bio.QM'])
+        
+        # Default to ML + Bio if nothing specific
+        if not categories:
+            categories = ['cs.LG', 'q-bio.BM']
+        
+        return list(set(categories))  # Remove duplicates
 
 
 # Example usage

@@ -10,11 +10,16 @@ api_keys:
 
 # Data Collection
 collection:
+  # Recommended sources (no API key required)
   default_sources:
-    - pubmed
-    - semanticscholar
+    - pubmed      # Biomedical literature (PubMed Central)
+    - arxiv       # Preprints (CS, Physics, Quant Bio)
+  
+  # Optional: Semantic Scholar (requires API key for good rate limits)
+  # - semanticscholar
+  
   max_papers_per_query: 500
-  batch_size: 20  # Reduced batch size for PubMed API compatibility
+  batch_size: 20  # PubMed batch size
   
   # Default search queries to track (add your research areas)
   tracked_queries:
