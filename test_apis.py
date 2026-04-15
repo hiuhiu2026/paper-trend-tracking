@@ -46,36 +46,33 @@ def test_pubmed():
         return False
 
 
-def test_semantic_scholar():
-    """Test Semantic Scholar API"""
+def test_arxiv():
+    """Test arXiv API"""
     print("\n" + "=" * 60)
-    print("Testing Semantic Scholar API")
+    print("Testing arXiv API")
     print("=" * 60)
     
-    collector = DataCollector()
+    collector = DataCollector(use_arxiv=True, use_semantic_scholar=False)
     
     try:
-        print("Waiting 65 seconds for rate limit reset...")
-        import time
-        time.sleep(65)
-        
-        papers = list(collector.semantic_scholar.search(
-            query="machine learning",
-            max_results=3
+        papers = list(collector.arxiv.search(
+            query="deep learning",
+            max_results=5,
+            categories=['cs.LG', 'cs.AI']
         ))
         
         print(f"✅ Retrieved {len(papers)} papers")
         for i, paper in enumerate(papers[:3], 1):
             print(f"\n{i}. {paper.title[:80]}")
-            print(f"   Authors: {len(paper.authors)}")
-            print(f"   Citations: {paper.citations_count}")
-            print(f"   Year: {paper.publication_date[:4] if paper.publication_date else 'N/A'}")
+            print(f"   arXiv: {paper.arxiv_id}")
+            print(f"   Categories: {', '.join(paper.categories)}")
+            print(f"   Date: {paper.publication_date}")
             print(f"   URL: {paper.url}")
         
         return len(papers) > 0
         
     except Exception as e:
-        print(f"❌ Semantic Scholar API error: {e}")
+        print(f"❌ arXiv API error: {e}")
         return False
 
 
@@ -85,15 +82,16 @@ def main():
     print(f"Time: {datetime.now().isoformat()}")
     
     pubmed_ok = test_pubmed()
-    # ss_ok = test_semantic_scholar()  # Skip due to rate limiting
+    arxiv_ok = test_arxiv()
     
     print("\n" + "=" * 60)
     print("Results:")
     print(f"  PubMed: {'✅ Working' if pubmed_ok else '❌ Failed'}")
-    # print(f"  Semantic Scholar: {'✅ Working' if ss_ok else '❌ Failed (rate limited?)'}")
+    print(f"  arXiv:  {'✅ Working' if arxiv_ok else '❌ Failed'}")
+    print("\n💡 Default config uses PubMed + arXiv (no API keys needed)")
     print("=" * 60)
     
-    return 0 if pubmed_ok else 1
+    return 0 if (pubmed_ok and arxiv_ok) else 1
 
 
 if __name__ == "__main__":
