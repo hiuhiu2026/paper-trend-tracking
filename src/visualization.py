@@ -397,11 +397,17 @@ class TrendDashboard:
             
             return table
         
-        # Run server
+        # Run server (Dash 3.x uses app.run, Dash 2.x uses app.run_server)
         logger.info(f"Starting dashboard on http://localhost:{port}")
         print(f"\n✅ Dashboard ready at: http://localhost:{port}")
         print(f"   Press Ctrl+C to stop\n")
-        app.run_server(host='0.0.0.0', port=port, debug=debug)
+        
+        # Try Dash 3.x API first, fallback to 2.x
+        try:
+            app.run(host='0.0.0.0', port=port, debug=debug)
+        except AttributeError:
+            # Dash 2.x
+            app.run_server(host='0.0.0.0', port=port, debug=debug)
 
 
 def create_visualizations(db_path: str = "data/papers.db"):
