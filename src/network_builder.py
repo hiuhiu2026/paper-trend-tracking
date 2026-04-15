@@ -155,14 +155,16 @@ class NetworkBuilder:
         """Generate list of (start, end) date tuples for time windows"""
         windows = []
         
-        if time_window == 'week':
+        if time_window == 'day':
+            delta = timedelta(days=1)
+        elif time_window == 'week':
             delta = timedelta(weeks=1)
         elif time_window == 'month':
             delta = timedelta(days=30)
         elif time_window == 'quarter':
             delta = timedelta(days=90)
         else:
-            raise ValueError(f"Unknown time_window: {time_window}")
+            raise ValueError(f"Unknown time_window: {time_window}. Use 'day', 'week', 'month', or 'quarter'")
         
         current_start = from_date
         while current_start < to_date:
@@ -245,8 +247,12 @@ class NetworkBuilder:
             snapshot.density = nx.density(G)
             snapshot.num_components = nx.number_connected_components(G)
             
-            # Store edges as dict
-            snapshot.edges = {u: dict(v) for u, v in G.edges(data=True)}
+            # Store edges as dict (adjacency list format)
+            snapshot.edges = {}
+            for u, v, data in G.edges(data=True):
+                if u not in snapshot.edges:
+                    snapshot.edges[u] = {}
+                snapshot.edges[u][v] = data
             
             # Compute centrality metrics
             if snapshot.num_nodes > 0:
@@ -297,12 +303,17 @@ class NetworkBuilder:
             density=db_snapshot.density
         )
         
-        # Reconstruct graph from edges
+        # Reconstruct graph from edges (adjacency list format)
         edges_data = json.loads(db_snapshot.edges)
         G = nx.Graph()
         for u, neighbors in edges_data.items():
             for v, data in neighbors.items():
-                G.add_edge(u, v, **data)
+                # Handle both old format (dict) and new format (dict with data)
+                if isinstance(data, dict):
+                    G.add_edge(u, v, **data)
+                else:
+                    # Old format: just weight value
+                    G.add_edge(u, v, weight=data)
         
         snapshot.graph = G
         snapshot.edges = edges_data
@@ -311,7 +322,9 @@ class NetworkBuilder:
     
     def _parse_window(self, window_str: str) -> timedelta:
         """Parse time window string to timedelta"""
-        if window_str == 'week':
+        if window_str == 'day':
+            return timedelta(days=1)
+        elif window_str == 'week':
             return timedelta(weeks=1)
         elif window_str == 'month':
             return timedelta(days=30)
