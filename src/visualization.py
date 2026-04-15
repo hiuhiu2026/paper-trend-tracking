@@ -438,34 +438,38 @@ class TrendDashboard:
                     ], style={'padding': '20px', 'textAlign': 'center'})
                 
                 table = html.Table([
-                html.Thead([
-                    html.Tr([
-                        html.Th("Rank"),
-                        html.Th("Keyword"),
-                        html.Th("Growth Rate"),
-                        html.Th("Momentum"),
-                        html.Th("Occurrences")
+                    html.Thead([
+                        html.Tr([
+                            html.Th("Rank"),
+                            html.Th("Keyword"),
+                            html.Th("Growth Rate"),
+                            html.Th("Momentum"),
+                            html.Th("Occurrences")
+                        ])
+                    ]),
+                    html.Tbody([
+                        html.Tr([
+                            html.Td(i + 1),
+                            html.Td(trend['keyword']),
+                            html.Td(f"{trend.get('growth_rate', 0):.3f}"),
+                            html.Td(f"{trend.get('momentum', 0):.3f}"),
+                            html.Td(trend.get('occurrence_count', 0))
+                        ])
+                        for i, trend in enumerate(trends)
                     ])
-                ]),
-                html.Tbody([
-                    html.Tr([
-                        html.Td(i + 1),
-                        html.Td(trend['keyword']),
-                        html.Td(f"{trend.get('growth_rate', 0):.3f}"),
-                        html.Td(f"{trend.get('momentum', 0):.3f}"),
-                        html.Td(trend.get('occurrence_count', 0))
-                    ])
-                    for i, trend in enumerate(trends)
-                ])
-            ], style={'width': '100%', 'borderCollapse': 'collapse'})
-            
-            # Add styling
-            for row in table.children[1].children:
-                for cell in row.children:
-                    cell.style['padding'] = '8px'
-                    cell.style['border'] = '1px solid #ddd'
-            
-            return table
+                ], style={'width': '100%', 'borderCollapse': 'collapse'})
+                
+                # Add styling
+                for row in table.children[1].children:
+                    for cell in row.children:
+                        cell.style['padding'] = '8px'
+                        cell.style['border'] = '1px solid #ddd'
+                
+                return table
+                
+            except Exception as e:
+                logger.error(f"Error updating table: {e}")
+                return html.P(f"Error: {e}")
         
         # Run server (Dash 3.x uses app.run, Dash 2.x uses app.run_server)
         logger.info(f"Starting dashboard on http://localhost:{port}")
