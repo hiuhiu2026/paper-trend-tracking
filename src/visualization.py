@@ -381,7 +381,7 @@ class TrendDashboard:
             # Get latest snapshot
             session = self.db.get_session()
             try:
-                # Try to get any snapshot first
+                # Get latest snapshot regardless of time window
                 latest = session.query(KeywordNetworkSnapshot).order_by(
                     KeywordNetworkSnapshot.snapshot_date.desc()
                 ).first()
@@ -389,36 +389,30 @@ class TrendDashboard:
                 if not latest:
                     logger.debug("No network snapshots found")
                     return go.Figure(layout=go.Layout(
-                        title="No network data available - Run pipeline first",
+                        title="No network data available",
                         xaxis={'visible': False},
                         yaxis={'visible': False},
                         annotations=[{
-                            'text': "Run: python run_virtualcell.py --network",
+                            'text': "Data loaded from database",
                             'xref': 'paper', 'yref': 'paper',
                             'showarrow': False, 'font': {'size': 14}
                         }]
                     ))
                 
-                # Try to get snapshot with selected time window
-                snapshot_data = session.query(KeywordNetworkSnapshot).filter(
-                    KeywordNetworkSnapshot.time_window == time_window
-                ).order_by(KeywordNetworkSnapshot.snapshot_date.desc()).first()
-                
-                # Fallback to any snapshot if time window not found
-                if not snapshot_data:
-                    logger.debug(f"No snapshots for {time_window}, using latest")
-                    snapshot_data = latest
-                
-                snapshot = self.network_builder._load_snapshot(snapshot_data)
+                # Load snapshot
+                snapshot = self.network_builder._load_snapshot(latest)
                 
                 if snapshot and snapshot.num_nodes > 0:
-                    return self.visualizer.plot_network(snapshot.graph, save=False)
+                    logger.info(f"Displaying network: {snapshot.num_nodes} nodes, {snapshot.num_edges} edges")
+                    return self.visualizer.plot_network(snapshot.graph, save=False, top_n=min(50, snapshot.num_nodes))
                 else:
-                    return go.Figure(layout=go.Layout(title="Empty network"))
+                    return go.Figure(layout=go.Layout(title="Network has no nodes"))
                     
             except Exception as e:
                 logger.error(f"Error updating network: {e}")
-                return go.Figure(layout=go.Layout(title=f"Error: {e}"))
+                import traceback
+                traceback.print_exc()
+                return go.Figure(layout=go.Layout(title=f"Error: {str(e)}"))
             finally:
                 session.close()
         
@@ -474,14 +468,18 @@ class TrendDashboard:
         # Run server (Dash 3.x uses app.run, Dash 2.x uses app.run_server)
         logger.info(f"Starting dashboard on http://localhost:{port}")
         print(f"\n✅ Dashboard ready at: http://localhost:{port}")
+        print(f"   Features:")
+        print(f"     - Trending keywords chart")
+        print(f"     - Keyword network visualization")
+        print(f"     - Data table")
         print(f"   Press Ctrl+C to stop\n")
         
         # Try Dash 3.x API first, fallback to 2.x
         try:
-            app.run(host='0.0.0.0', port=port, debug=debug)
+            app.run(host='0.0.0.0', port=port, debug=debug, use_reloader=False)
         except AttributeError:
             # Dash 2.x
-            app.run_server(host='0.0.0.0', port=port, debug=debug)
+            app.run_server(host='0.0.0.0', port=port, debug=debug, use_reloader=False)
 
 
 def create_visualizations(db_path: str = "data/papers.db"):

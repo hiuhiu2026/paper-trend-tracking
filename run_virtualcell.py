@@ -62,6 +62,8 @@ Examples:
                         help='Launch dashboard after collection')
     parser.add_argument('--dashboard-port', type=int, default=8051,
                         help='Dashboard port (default: 8051)')
+    parser.add_argument('--debug', action='store_true',
+                        help='Enable debug mode for dashboard')
     
     args = parser.parse_args()
     
@@ -100,11 +102,13 @@ Examples:
             
             try:
                 dashboard = TrendDashboard(db_path=str(vc_db))
-                dashboard.create_dashboard(port=args.dashboard_port, debug=False)
+                dashboard.create_dashboard(port=args.dashboard_port, debug=args.debug)
             except KeyboardInterrupt:
                 print("\n\n👋 Dashboard stopped by user")
             except Exception as e:
                 print(f"\n❌ Dashboard error: {e}")
+                import traceback
+                traceback.print_exc()
                 print("\n💡 Try:")
                 print("   python run_dashboard.py --db", vc_db)
         else:
