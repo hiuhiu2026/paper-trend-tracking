@@ -29,6 +29,8 @@ if str(src_path) not in sys.path:
 
 from data_collector import DataCollector, Paper
 from keyword_extractor import create_extractor
+from network_builder import NetworkBuilder, TrendAnalyzer
+from visualization import NetworkVisualizer, TrendDashboard
 
 
 # ============================================================================
@@ -435,14 +437,132 @@ Keep it concise and professional."""
         
         return '\n'.join(report)
     
-    def run(self, days_back: int = 3, max_per_query: int = 50, output_file: str = None):
+    def build_network_and_trends(self, papers: List[VirtualCellPaper], time_window: str = 'week'):
         """
-        Run full pipeline: collect → categorize → generate report
+        Build keyword network and analyze trends
+        
+        Args:
+            papers: List of VirtualCellPaper objects
+            time_window: Network time window (day/week/month)
+        
+        Returns:
+            Tuple of (snapshots, trends, visualizer)
+        """
+        from database import DatabaseManager
+        
+        # Create temporary database for Virtual Cell papers
+        vc_db_path = self.output_dir / "virtual_cell_papers.db"
+        db = DatabaseManager(f"sqlite:///{vc_db_path}")
+        
+        # Insert papers into database
+        logger.info(f"Building network from {len(papers)} papers...")
+        
+        session = db.get_session()
+        try:
+            from database import PaperModel, KeywordModel
+            from datetime import datetime as dt
+            
+            for vp in papers:
+                paper = vp.paper
+                
+                # Create paper model
+                paper_model = PaperModel(
+                    id=paper.id,
+                    title=paper.title,
+                    abstract=paper.abstract,
+                    publication_date=paper.publication_date,
+                    journal=paper.journal,
+                    doi=paper.doi,
+                    source=paper.source,
+                    url=paper.url,
+                    citations_count=paper.citations_count,
+                    collected_at=dt.utcnow()
+                )
+                
+                # Add keywords
+                for kw in paper.keywords:
+                    keyword = session.query(KeywordModel).filter(
+                        KeywordModel.name == kw
+                    ).first()
+                    
+                    if not keyword:
+                        keyword = KeywordModel(
+                            name=kw,
+                            normalized_name=kw.lower(),
+                            first_seen=dt.utcnow(),
+                            last_seen=dt.utcnow(),
+                            total_occurrences=0
+                        )
+                        session.add(keyword)
+                    
+                    keyword.total_occurrences = (keyword.total_occurrences or 0) + 1
+                    paper_model.keywords.append(keyword)
+                
+                session.add(paper_model)
+            
+            session.commit()
+            
+        except Exception as e:
+            session.rollback()
+            logger.error(f"Error inserting papers: {e}")
+            return None, None, None
+        finally:
+            session.close()
+        
+        # Build network
+        builder = NetworkBuilder(db, min_cooccurrence=2)
+        
+        from datetime import timedelta
+        from_date = dt.utcnow() - timedelta(days=30)
+        
+        snapshots = builder.build_snapshots(
+            from_date=from_date,
+            time_window=time_window,
+            overwrite=True
+        )
+        
+        if not snapshots:
+            logger.warning("No snapshots built (not enough data)")
+            return None, None, None
+        
+        logger.info(f"Built {len(snapshots)} network snapshots")
+        
+        # Analyze trends
+        analyzer = TrendAnalyzer(db)
+        analyzer.compute_trend_metrics(snapshots)
+        
+        trends = analyzer.get_trending_keywords(limit=50)
+        
+        # Create visualizations
+        visualizer = NetworkVisualizer(str(self.output_dir / "vc_visualizations"))
+        
+        # Generate network graph
+        if snapshots:
+            latest_snapshot = snapshots[-1]
+            visualizer.plot_network(
+                latest_snapshot.graph,
+                title="Virtual Cell Keyword Network",
+                top_n=50,
+                save=True
+            )
+        
+        # Generate trend charts
+        if trends:
+            visualizer.plot_trend_evolution(trends, metric='growth_rate', top_n=30, save=True)
+        
+        return snapshots, trends, visualizer
+    
+    def run(self, days_back: int = 3, max_per_query: int = 50, output_file: str = None, 
+            build_network: bool = True, time_window: str = 'week'):
+        """
+        Run full pipeline: collect → categorize → generate report → build network
         
         Args:
             days_back: Days to look back
             max_per_query: Max papers per query
             output_file: Output file path (default: output/virtual-cell-{date}.md)
+            build_network: Whether to build keyword network and trends
+            time_window: Network time window (day/week/month)
         """
         logger.info("=" * 70)
         logger.info("  VIRTUAL CELL LITERATURE TRACKER")
@@ -478,22 +598,101 @@ Keep it concise and professional."""
             f.write(report)
         
         logger.info(f"📌 Latest report: {latest_file}")
+        
+        # Build network and trends
+        if build_network and len(papers) >= 10:
+            logger.info("\n" + "=" * 70)
+            logger.info("  BUILDING NETWORK & TRENDS")
+            logger.info("=" * 70)
+            
+            snapshots, trends, visualizer = self.build_network_and_trends(
+                papers, time_window=time_window
+            )
+            
+            if snapshots and trends:
+                logger.info(f"✅ Network built: {len(snapshots)} snapshots")
+                logger.info(f"✅ Trends analyzed: {len(trends)} trending keywords")
+                logger.info(f"📈 Visualizations saved to: {self.output_dir / 'vc_visualizations'}")
+                
+                # Add network info to report
+                network_info = []
+                network_info.append("\n---\n")
+                network_info.append("## 🕸️ Keyword Network Analysis\n")
+                network_info.append(f"- **Snapshots:** {len(snapshots)}\n")
+                
+                if snapshots:
+                    latest = snapshots[-1]
+                    network_info.append(f"- **Latest Network:** {latest.num_nodes} keywords, {latest.num_edges} connections\n")
+                
+                if trends:
+                    network_info.append("\n### 🔥 Top Trending Keywords:\n")
+                    for i, trend in enumerate(trends[:10], 1):
+                        network_info.append(f"{i}. **{trend['keyword']}** (growth: {trend.get('growth_rate', 0):.2f})\n")
+                
+                # Append to report
+                with open(output_file, 'a', encoding='utf-8') as f:
+                    f.write(''.join(network_info))
+                
+                logger.info(f"📊 Network analysis added to report")
+        
+        # Dashboard launch info
+        logger.info("\n" + "=" * 70)
+        logger.info("  NEXT STEPS")
+        logger.info("=" * 70)
+        logger.info("\n📊 Launch Dashboard:")
+        logger.info(f"   python run_dashboard.py --db {self.output_dir / 'virtual_cell_papers.db'}")
+        logger.info(f"\n🌐 Open: http://localhost:8050")
+        logger.info("\n📁 Output files:")
+        logger.info(f"   - Report: {output_file}")
+        logger.info(f"   - Database: {self.output_dir / 'virtual_cell_papers.db'}")
+        logger.info(f"   - Visualizations: {self.output_dir / 'vc_visualizations'}\n")
 
 
 def main():
     """Main entry point"""
     import argparse
     
-    parser = argparse.ArgumentParser(description='Virtual Cell Literature Tracker')
-    parser.add_argument('--days', type=int, default=3, help='Days to look back')
-    parser.add_argument('--max', type=int, default=50, help='Max papers per query')
-    parser.add_argument('--output', type=str, default=None, help='Output file')
+    parser = argparse.ArgumentParser(
+        description='Virtual Cell Literature Tracker',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Basic usage (collect last 3 days)
+  python virtual_cell_tracker.py
+  
+  # Collect last week, build network
+  python virtual_cell_tracker.py --days 7 --network
+  
+  # Generate report only (no network)
+  python virtual_cell_tracker.py --days 1 --no-network
+  
+  # Custom output
+  python virtual_cell_tracker.py --output weekly-report.md
+        """
+    )
+    
+    parser.add_argument('--days', type=int, default=3, help='Days to look back (default: 3)')
+    parser.add_argument('--max', type=int, default=50, help='Max papers per query (default: 50)')
+    parser.add_argument('--output', type=str, default=None, help='Output file path')
     parser.add_argument('--config', type=str, default='config.yaml', help='Config file')
+    parser.add_argument('--network', action='store_true', help='Build keyword network and trends')
+    parser.add_argument('--no-network', action='store_true', help='Skip network building')
+    parser.add_argument('--time-window', type=str, default='week', 
+                        choices=['day', 'week', 'month'], help='Network time window')
     
     args = parser.parse_args()
     
+    # Determine if network should be built
+    build_network = args.network or (not args.no_network)
+    
     tracker = VirtualCellTracker(config_path=args.config)
-    tracker.run(days_back=args.days, max_per_query=args.max, output_file=args.output)
+    tracker.run(
+        days_back=args.days,
+        max_per_query=args.max,
+        output_file=args.output,
+        build_network=build_network,
+        time_window=args.time_window
+    )
 
 
 if __name__ == "__main__":

@@ -63,21 +63,28 @@ collection:
 ### 3. Run Tracker
 
 ```bash
-# Collect last 3 days, generate report
-python src/virtual_cell_tracker.py
+# Quick launcher (recommended)
+python run_virtualcell.py
+
+# Collect last 3 days, build network, launch dashboard
+python run_virtualcell.py --days 3 --dashboard
 
 # Custom settings
-python src/virtual_cell_tracker.py --days 7 --max 100
+python run_virtualcell.py --days 7 --max 100 --time-window month
 ```
 
-### 4. View Report
+### 4. View Results
 
 ```bash
-# Latest report
+# View report
 cat output/virtual-cell-latest.md
 
-# Specific date
-cat output/virtual-cell-2026-04-15.md
+# View network visualizations
+ls output/vc_visualizations/
+
+# Launch dashboard
+python run_virtualcell.py --dashboard
+# Open: http://localhost:8051
 ```
 
 ## Search Queries
