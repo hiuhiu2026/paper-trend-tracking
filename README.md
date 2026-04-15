@@ -230,11 +230,23 @@ python -c "from src.visualization import create_visualizations; create_visualiza
 | Source | Free Tier | With API Key |
 |--------|-----------|--------------|
 | PubMed | 3 req/sec | 10 req/sec |
-| Semantic Scholar | 10 req/sec | 100 req/sec (request) |
+| Semantic Scholar | ~1 req/sec* | 100 req/sec (request) |
+
+*Without API key, Semantic Scholar enforces strict rate limiting. The client uses conservative delays (1 sec/request) to avoid 429 errors. For production use, get a free API key.
 
 Get API keys:
-- PubMed: https://www.ncbi.nlm.nih.gov/account/
-- Semantic Scholar: https://www.semanticscholar.org/product/api
+- **PubMed**: https://www.ncbi.nlm.nih.gov/account/
+- **Semantic Scholar**: https://www.semanticscholar.org/product/api (click "Get API Key")
+
+### Configure API Keys
+
+Edit `config.yaml`:
+
+```yaml
+api_keys:
+  pubmed: "your_ncbi_api_key"
+  semantic_scholar: "your_s2_api_key"
+```
 
 ## Next Steps
 
