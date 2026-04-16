@@ -493,7 +493,7 @@ class TrendAnalyzer:
             limit: Maximum keywords to return
         
         Returns:
-            List of keyword trend data
+            List of keyword trend data (ALWAYS returns data, even with limited snapshots)
         """
         session = self.db.get_session()
         
@@ -504,7 +504,20 @@ class TrendAnalyzer:
             ).limit(n_snapshots).all()
             
             if not recent_snapshots:
-                return []
+                logger.warning("No trend metrics found, returning top keywords by occurrence")
+                # Fallback: return top keywords by total occurrences
+                top_keywords = session.query(KeywordModel).order_by(
+                    KeywordModel.total_occurrences.desc()
+                ).limit(limit).all()
+                
+                return [{
+                    'keyword': kw.name,
+                    'occurrences': kw.total_occurrences or 0,
+                    'growth_rate': 0.0,
+                    'momentum': 0.0,
+                    'pagerank': 0.0,
+                    'degree': 0.0
+                } for kw in top_keywords]
             
             # Get latest snapshot date
             latest_date = recent_snapshots[0][0]

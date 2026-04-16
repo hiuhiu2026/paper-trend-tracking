@@ -1,1 +1,79 @@
-[]
+[
+  {
+    "keyword": "artificial intelligence",
+    "normalized_keyword": "artificial intelligence",
+    "growth_rate": 2.0,
+    "momentum": 2.0,
+    "degree": 0.0009143553794574824,
+    "betweenness": 0.0,
+    "pagerank": 0.0018017175009359021,
+    "occurrence_count": 6,
+    "snapshot_date": "2026-04-16T06:34:16.995577"
+  },
+  {
+    "keyword": "intelligence",
+    "normalized_keyword": "intelligence",
+    "growth_rate": 1.5,
+    "momentum": 1.5,
+    "degree": 0.0009143553794574824,
+    "betweenness": 0.0,
+    "pagerank": 0.0020032308605586304,
+    "occurrence_count": 5,
+    "snapshot_date": "2026-04-16T06:34:16.995577"
+  },
+  {
+    "keyword": "Large Language",
+    "normalized_keyword": "large language",
+    "growth_rate": 0.6666666666666666,
+    "momentum": 0.6666666666666666,
+    "degree": 0.0009143553794574824,
+    "betweenness": 0.0,
+    "pagerank": 0.002443515575116531,
+    "occurrence_count": 5,
+    "snapshot_date": "2026-04-16T06:34:16.995577"
+  },
+  {
+    "keyword": "deep learning",
+    "normalized_keyword": "deep learning",
+    "growth_rate": 0.375,
+    "momentum": 0.375,
+    "degree": 0.0018287107589149648,
+    "betweenness": 0.0,
+    "pagerank": 0.003694814129978794,
+    "occurrence_count": 11,
+    "snapshot_date": "2026-04-16T06:34:16.995577"
+  },
+  {
+    "keyword": "Intelligence",
+    "normalized_keyword": "intelligence",
+    "growth_rate": 0.16666666666666666,
+    "momentum": 0.16666666666666666,
+    "degree": 0.0009143553794574824,
+    "betweenness": 0.0,
+    "pagerank": 0.0022615968338004417,
+    "occurrence_count": 7,
+    "snapshot_date": "2026-04-16T06:34:16.995577"
+  },
+  {
+    "keyword": "Artificial Intelligence",
+    "normalized_keyword": "artificial intelligence",
+    "growth_rate": 0.1111111111111111,
+    "momentum": 0.1111111111111111,
+    "degree": 0.0009143553794574824,
+    "betweenness": 0.0,
+    "pagerank": 0.0022615968338004417,
+    "occurrence_count": 10,
+    "snapshot_date": "2026-04-16T06:34:16.995577"
+  },
+  {
+    "keyword": "large language",
+    "normalized_keyword": "large language",
+    "growth_rate": Infinity,
+    "momentum": 0.0,
+    "degree": 0.0012191405059433099,
+    "betweenness": 0.0,
+    "pagerank": 0.002409648616048171,
+    "occurrence_count": 6,
+    "snapshot_date": "2026-04-16T06:34:16.995577"
+  }
+]

@@ -159,15 +159,15 @@
             
             <div class="stats">
                 <div class="stat-card">
-                    <div class="stat-number">238</div>
+                    <div class="stat-number">359</div>
                     <div class="stat-label">Papers</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-number">2216</div>
+                    <div class="stat-number">3282</div>
                     <div class="stat-label">Keywords</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-number">0</div>
+                    <div class="stat-number">7</div>
                     <div class="stat-label">Trending</div>
                 </div>
             </div>
@@ -182,16 +182,24 @@
             <div class="chart-container">
                 <h2>📈 Trending Keywords</h2>
                 
-                <div style="background: #f7fafc; border-left: 4px solid #667eea; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
-                    <h3 style="color: #2d3748; margin-bottom: 10px;">📈 Trend Analysis Status</h3>
-                    <p style="color: #4a5568; line-height: 1.6;">
-                        <strong>Building historical trend data...</strong><br>
-                        Currently analyzing papers from the last 365 days grouped by month.<br>
-                        Trend visualization requires 3+ monthly snapshots to calculate growth rates.<br><br>
-                        <strong>Current status:</strong> 2 monthly snapshots collected<br>
-                        <strong>Next update:</strong> Run daily collection to accumulate more time-series data<br><br>
-                        <em>Check back after collecting papers across 3+ different months to see full trend visualizations!</em>
-                    </p>
+                <div class="tabs">
+                    <button class="tab active" onclick="showChart('growth_rate')">🚀 Growth Rate</button>
+                    <button class="tab" onclick="showChart('momentum')">⚡ Momentum</button>
+                    <button class="tab" onclick="showChart('pagerank')">🎯 PageRank</button>
+                    <button class="tab" onclick="showChart('degree')">🔗 Degree</button>
+                </div>
+                
+                <div id="growth_rate" class="chart-frame active">
+                    <iframe src="charts/trends_growth_rate.html" title="Growth Rate"></iframe>
+                </div>
+                <div id="momentum" class="chart-frame">
+                    <iframe src="charts/trends_momentum.html" title="Momentum"></iframe>
+                </div>
+                <div id="pagerank" class="chart-frame">
+                    <iframe src="charts/trends_pagerank.html" title="PageRank"></iframe>
+                </div>
+                <div id="degree" class="chart-frame">
+                    <iframe src="charts/trends_degree.html" title="Degree"></iframe>
                 </div>
             </div>
             
