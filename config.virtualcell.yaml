@@ -6,10 +6,10 @@ api_keys:
 
 # LLM Configuration (for auto-summaries AND hot topic analysis)
 llm:
-  enabled: true  # Enable for hot topic identification
-  provider: deepseek  # Using DeepSeek
-  model: deepseek-chat  # DeepSeek's main model
-  api_key: "sk-ad8ff3e72d62483ea452807204948665"  # DeepSeek API key
+  enabled: false  # Disabled - DeepSeek geo-restricted
+  provider: null
+  model: null
+  api_key: null  # DeepSeek key removed
 
 # Collection Settings
 collection:
