@@ -182,24 +182,14 @@
             <div class="chart-container">
                 <h2>📈 Trending Keywords</h2>
                 
-                <div class="tabs">
-                    <button class="tab active" onclick="showChart('growth_rate')">🚀 Growth Rate</button>
-                    <button class="tab" onclick="showChart('momentum')">⚡ Momentum</button>
-                    <button class="tab" onclick="showChart('pagerank')">🎯 PageRank</button>
-                    <button class="tab" onclick="showChart('degree')">🔗 Degree</button>
-                </div>
-                
-                <div id="growth_rate" class="chart-frame active">
-                    <iframe src="charts/trends_growth_rate.html" title="Growth Rate"></iframe>
-                </div>
-                <div id="momentum" class="chart-frame">
-                    <iframe src="charts/trends_momentum.html" title="Momentum"></iframe>
-                </div>
-                <div id="pagerank" class="chart-frame">
-                    <iframe src="charts/trends_pagerank.html" title="PageRank"></iframe>
-                </div>
-                <div id="degree" class="chart-frame">
-                    <iframe src="charts/trends_degree.html" title="Degree"></iframe>
+                <div style="background: #f7fafc; border-left: 4px solid #667eea; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                    <h3 style="color: #2d3748; margin-bottom: 10px;">📈 Trend Analysis</h3>
+                    <p style="color: #4a5568; line-height: 1.6;">
+                        <strong>Trend charts require historical data with multiple time snapshots.</strong><br>
+                        Currently collecting papers from a single time period. As more data accumulates over time, 
+                        trend analysis will show keyword growth rates, momentum, and emerging topics.<br><br>
+                        <em>Check back after several collection cycles to see trend visualizations!</em>
+                    </p>
                 </div>
             </div>
             
