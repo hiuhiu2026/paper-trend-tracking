@@ -554,15 +554,17 @@ Keep it concise and professional."""
         finally:
             session.close()
         
-        # Build network
+        # Build network with MONTHLY snapshots for the last YEAR
         builder = NetworkBuilder(db, min_cooccurrence=2)
         
         from datetime import timedelta
-        from_date = dt.utcnow() - timedelta(days=30)
+        # Use last 365 days (1 year) for trend analysis
+        from_date = dt.utcnow() - timedelta(days=365)
         
+        # Build monthly snapshots for better trend visualization
         snapshots = builder.build_snapshots(
             from_date=from_date,
-            time_window=time_window,
+            time_window='month',  # Monthly snapshots
             overwrite=True
         )
         
@@ -570,7 +572,7 @@ Keep it concise and professional."""
             logger.warning("No snapshots built (not enough data)")
             return None, None, None
         
-        logger.info(f"Built {len(snapshots)} network snapshots")
+        logger.info(f"Built {len(snapshots)} MONTHLY network snapshots (last 365 days)")
         
         # Analyze trends
         analyzer = TrendAnalyzer(db)

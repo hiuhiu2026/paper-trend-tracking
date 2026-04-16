@@ -185,11 +185,19 @@ class NetworkBuilder:
         session = self.db.get_session()
         
         try:
-            # Get papers in this time window
+            # Get papers in this time window - use publication_date for historical trends
+            # This groups papers by when they were published, not when we collected them
             papers = session.query(PaperModel).filter(
-                PaperModel.collected_at >= start_date,
-                PaperModel.collected_at <= end_date
+                PaperModel.publication_date >= start_date.strftime('%Y-%m-%d'),
+                PaperModel.publication_date <= end_date.strftime('%Y-%m-%d')
             ).all()
+            
+            # If no papers found by publication_date, try collected_at (fallback)
+            if not papers:
+                papers = session.query(PaperModel).filter(
+                    PaperModel.collected_at >= start_date,
+                    PaperModel.collected_at <= end_date
+                ).all()
             
             if not papers:
                 logger.debug(f"  No papers in window {start_date.date()} - {end_date.date()}")
