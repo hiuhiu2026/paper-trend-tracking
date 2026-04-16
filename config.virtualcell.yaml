@@ -13,8 +13,8 @@ llm:
 
 # Collection Settings
 collection:
-  days_back: 3  # Collect papers from last N days
-  max_per_query: 50  # Max papers per search query
+  days_back: 1095  # Collect papers from last 3 years (365 * 3 = 1095 days)
+  max_per_query: 200  # Max papers per search query (increased for historical collection)
   
   # Virtual Cell specific queries
   # Edit these to customize your focus

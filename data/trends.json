@@ -1,0 +1,178 @@
+[
+  {
+    "keyword": "Machine Learning",
+    "normalized_keyword": "machine learning",
+    "growth_rate": 3.0,
+    "momentum": 3.0,
+    "degree": 0.0004608294930875576,
+    "betweenness": 0.0,
+    "pagerank": 0.0026785393683936235,
+    "occurrence_count": 8,
+    "snapshot_date": "2026-04-16T03:57:11.713383"
+  },
+  {
+    "keyword": "molecular dynamics",
+    "normalized_keyword": "molecular dynamics",
+    "growth_rate": 0.6666666666666666,
+    "momentum": 0.6666666666666666,
+    "degree": 0.0009216589861751152,
+    "betweenness": 0.0,
+    "pagerank": 0.0029715279761959174,
+    "occurrence_count": 5,
+    "snapshot_date": "2026-04-16T03:57:11.713383"
+  },
+  {
+    "keyword": "virtual screening",
+    "normalized_keyword": "virtual screening",
+    "growth_rate": 0.3333333333333333,
+    "momentum": 0.3333333333333333,
+    "degree": 0.0009216589861751152,
+    "betweenness": 0.0,
+    "pagerank": 0.0029715279761959174,
+    "occurrence_count": 4,
+    "snapshot_date": "2026-04-16T03:57:11.713383"
+  },
+  {
+    "keyword": "Artificial Intelligence",
+    "normalized_keyword": "artificial intelligence",
+    "growth_rate": Infinity,
+    "momentum": 0.0,
+    "degree": 0.0013824884792626728,
+    "betweenness": 0.0,
+    "pagerank": 0.0034709390860276647,
+    "occurrence_count": 7,
+    "snapshot_date": "2026-04-16T03:57:11.713383"
+  },
+  {
+    "keyword": "Intelligence",
+    "normalized_keyword": "intelligence",
+    "growth_rate": Infinity,
+    "momentum": 0.0,
+    "degree": 0.0013824884792626728,
+    "betweenness": 0.0,
+    "pagerank": 0.0034709390860276647,
+    "occurrence_count": 4,
+    "snapshot_date": "2026-04-16T03:57:11.713383"
+  },
+  {
+    "keyword": "deep learning",
+    "normalized_keyword": "deep learning",
+    "growth_rate": Infinity,
+    "momentum": 0.0,
+    "degree": 0.0009216589861751152,
+    "betweenness": 0.0,
+    "pagerank": 0.0026785393683936235,
+    "occurrence_count": 8,
+    "snapshot_date": "2026-04-16T03:57:11.713383"
+  },
+  {
+    "keyword": "Artificial",
+    "normalized_keyword": "artificial",
+    "growth_rate": Infinity,
+    "momentum": 0.0,
+    "degree": 0.0009216589861751152,
+    "betweenness": 0.0,
+    "pagerank": 0.0,
+    "occurrence_count": 3,
+    "snapshot_date": "2026-04-16T03:57:11.713383"
+  },
+  {
+    "keyword": "molecular dynamics simulations",
+    "normalized_keyword": "molecular dynamics simulations",
+    "growth_rate": Infinity,
+    "momentum": 0.0,
+    "degree": 0.0009216589861751152,
+    "betweenness": 0.0,
+    "pagerank": 0.0,
+    "occurrence_count": 2,
+    "snapshot_date": "2026-04-16T03:57:11.713383"
+  },
+  {
+    "keyword": "Large Language Model",
+    "normalized_keyword": "large language model",
+    "growth_rate": Infinity,
+    "momentum": 0.0,
+    "degree": 0.0009216589861751152,
+    "betweenness": 0.0,
+    "pagerank": 0.0026785393683936235,
+    "occurrence_count": 2,
+    "snapshot_date": "2026-04-16T03:57:11.713383"
+  },
+  {
+    "keyword": "Large Language",
+    "normalized_keyword": "large language",
+    "growth_rate": Infinity,
+    "momentum": 0.0,
+    "degree": 0.0009216589861751152,
+    "betweenness": 0.0,
+    "pagerank": 0.0026785393683936235,
+    "occurrence_count": 3,
+    "snapshot_date": "2026-04-16T03:57:11.713383"
+  },
+  {
+    "keyword": "Language Model",
+    "normalized_keyword": "language model",
+    "growth_rate": Infinity,
+    "momentum": 0.0,
+    "degree": 0.0009216589861751152,
+    "betweenness": 0.0,
+    "pagerank": 0.0026785393683936235,
+    "occurrence_count": 2,
+    "snapshot_date": "2026-04-16T03:57:11.713383"
+  },
+  {
+    "keyword": "learning framework",
+    "normalized_keyword": "learning framework",
+    "growth_rate": Infinity,
+    "momentum": 0.0,
+    "degree": 0.0009216589861751152,
+    "betweenness": 0.0,
+    "pagerank": 0.0026785393683936235,
+    "occurrence_count": 3,
+    "snapshot_date": "2026-04-16T03:57:11.713383"
+  },
+  {
+    "keyword": "Development.",
+    "normalized_keyword": "development.",
+    "growth_rate": Infinity,
+    "momentum": 0.0,
+    "degree": 0.0009216589861751152,
+    "betweenness": 0.0,
+    "pagerank": 0.0,
+    "occurrence_count": 2,
+    "snapshot_date": "2026-04-16T03:57:11.713383"
+  },
+  {
+    "keyword": "deep learning framework",
+    "normalized_keyword": "deep learning framework",
+    "growth_rate": Infinity,
+    "momentum": 0.0,
+    "degree": 0.0009216589861751152,
+    "betweenness": 0.0,
+    "pagerank": 0.0,
+    "occurrence_count": 3,
+    "snapshot_date": "2026-04-16T03:57:11.713383"
+  },
+  {
+    "keyword": "breast cancer.",
+    "normalized_keyword": "breast cancer.",
+    "growth_rate": Infinity,
+    "momentum": 0.0,
+    "degree": 0.0004608294930875576,
+    "betweenness": 0.0,
+    "pagerank": 0.0026785393683936235,
+    "occurrence_count": 3,
+    "snapshot_date": "2026-04-16T03:57:11.713383"
+  },
+  {
+    "keyword": "molecular dynamics simulations.",
+    "normalized_keyword": "molecular dynamics simulations.",
+    "growth_rate": Infinity,
+    "momentum": 0.0,
+    "degree": 0.0004608294930875576,
+    "betweenness": 0.0,
+    "pagerank": 0.0026785393683936235,
+    "occurrence_count": 2,
+    "snapshot_date": "2026-04-16T03:57:11.713383"
+  }
+]
