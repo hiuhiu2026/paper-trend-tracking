@@ -4,12 +4,12 @@
 api_keys:
   pubmed: null  # https://www.ncbi.nlm.nih.gov/account/
 
-# LLM Configuration (optional, for auto-summaries)
+# LLM Configuration (for auto-summaries AND hot topic analysis)
 llm:
-  enabled: false
-  provider: openai
-  model: gpt-4o-mini
-  api_key: null  # https://platform.openai.com/api-keys
+  enabled: true  # Enable for hot topic identification
+  provider: deepseek  # Using DeepSeek
+  model: deepseek-chat  # DeepSeek's main model
+  api_key: "sk-ad8ff3e72d62483ea452807204948665"  # DeepSeek API key
 
 # Collection Settings
 collection:
