@@ -109,13 +109,20 @@ DOMAIN_KEYWORDS = {
     ],
 }
 
-# Top journals in the field
+# Top journals in the field (updated April 2026 for AIVC research)
 TOP_JOURNALS = [
-    "Cell", "Nature", "Science",
-    "Cell Systems", "Nature Methods", "Nature Biotechnology",
-    "PLOS Computational Biology", "Bioinformatics",
+    # Tier 1: Premier (IF 20+)
+    "Cell", "Nature", "Nature Methods", "Nature Biotechnology",
+    # Tier 2: High-Impact (IF 10-20)
+    "Nature Digital Medicine", "Nature Communications",
+    "Briefings in Bioinformatics", "PNAS", "Science Advances",
+    "The Innovation",
+    # Tier 3: Specialized (IF 5-10)
+    "PLOS Computational Biology", "ACS Biomaterials",
+    "Advanced Science", "Stem Cell", "International Journal of Molecular",
+    "iScience", "Bioinformatics", "Cell Systems",
     "Cell Reports", "Molecular Systems Biology",
-    "Journal of Cell Biology", "Developmental Cell",
+    # Preprint servers
     "BioRxiv", "arXiv"
 ]
 
