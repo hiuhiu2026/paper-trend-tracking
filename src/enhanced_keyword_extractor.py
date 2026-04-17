@@ -242,10 +242,15 @@ Analyze and identify hot research directions (JSON only):"""
             keyword_counts = Counter(all_keywords)
             top_keywords = [kw for kw, count in keyword_counts.most_common(top_n)]
             
+            if not top_keywords:
+                logger.warning("⚠️  No keywords available for hot topic analysis")
+                return {"hot_directions": [], "overall_trends": "No keywords collected yet"}
+            
             # Prepare prompt
             prompt = self.HOT_TOPIC_PROMPT.format(keywords=", ".join(top_keywords))
             
             # Call DeepSeek
+            logger.debug(f"Sending {len(top_keywords)} keywords to DeepSeek for hot topic analysis...")
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
@@ -258,23 +263,43 @@ Analyze and identify hot research directions (JSON only):"""
             
             # Parse response
             content = response.choices[0].message.content.strip()
+            logger.debug(f"DeepSeek response length: {len(content)} chars")
             
-            # Extract JSON
+            # Extract JSON from response (handle markdown code blocks)
             json_match = re.search(r'\{[\s\S]*\}', content)
             if json_match:
                 content = json_match.group(0)
             
             result = json.loads(content)
             
-            logger.info(f"✅ DeepSeek identified {len(result.get('hot_directions', []))} hot research directions")
-            return result
+            # Validate structure
+            if not isinstance(result, dict):
+                logger.error(f"❌ Expected dict, got {type(result)}")
+                return {"hot_directions": [], "overall_trends": "Invalid response format"}
+            
+            # Handle different possible key names
+            hot_directions = result.get('hot_directions') or result.get('hot_topics') or result.get('directions') or []
+            overall_trends = result.get('overall_trends') or result.get('summary') or result.get('overview') or "Analysis completed"
+            
+            logger.info(f"✅ DeepSeek identified {len(hot_directions)} hot research directions")
+            
+            return {
+                "hot_directions": hot_directions,
+                "overall_trends": overall_trends
+            }
             
         except json.JSONDecodeError as e:
             logger.error(f"❌ Failed to parse hot topic analysis: {e}")
-            logger.debug(f"Raw response: {content[:500]}...")
-            return {"hot_directions": [], "overall_trends": "Analysis failed"}
+            logger.debug(f"Raw response: {content[:1000] if 'content' in dir() else 'N/A'}...")
+            return {"hot_directions": [], "overall_trends": f"JSON parsing failed: {e}"}
+        except KeyError as e:
+            logger.error(f"❌ Missing expected key in response: {e}")
+            logger.debug(f"Raw response: {content[:1000] if 'content' in dir() else 'N/A'}...")
+            return {"hot_directions": [], "overall_trends": f"Missing key: {e}"}
         except Exception as e:
             logger.error(f"❌ Hot topic analysis failed: {e}")
+            import traceback
+            traceback.print_exc()
             return {"hot_directions": [], "overall_trends": f"Analysis failed: {e}"}
     
     def generate_research_trend_report(self, hot_topics: Dict) -> str:
