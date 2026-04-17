@@ -4,20 +4,38 @@
 api_keys:
   pubmed: null  # https://www.ncbi.nlm.nih.gov/account/
 
-# LLM Configuration (for auto-summaries AND hot topic analysis)
+# ============================================================================
+# LLM Configuration - DEEPSEEK REQUIRED for keyword extraction
+# ============================================================================
+# This tracker uses DeepSeek LLM EXCLUSIVELY for:
+# 1. Extracting specific technical keywords from papers
+# 2. Identifying hot research directions and trends
+# 3. Generating insightful analysis reports
+#
+# ⚠️  Pattern matching has been REMOVED - DeepSeek is required for best results
+# ============================================================================
+
 llm:
-  enabled: false  # Disabled - DeepSeek geo-restricted
-  provider: null
-  model: null
-  api_key: null  # DeepSeek key removed
+  enabled: true  # ⚠️  MUST be true for keyword extraction to work
+  provider: deepseek  # Only 'deepseek' is supported (no OpenAI, no pattern matching)
+  model: deepseek-chat  # DeepSeek's flagship model
+  
+  # 🔑 GET YOUR API KEY: https://platform.deepseek.com/api-keys
+  # Paste your key below between the quotes:
+  api_key: YOUR_API_KEY_HERE
+  
+  # DeepSeek API endpoint (do not change unless using a proxy)
+  base_url: https://api.deepseek.com
+  
+  # Optional: Enable paper summarization (uses same API key)
+  enable_summarization: true
 
 # Collection Settings
 collection:
-  days_back: 1095  # Collect papers from last 3 years (365 * 3 = 1095 days)
-  max_per_query: 200  # Max papers per search query (increased for historical collection)
+  days_back: 1095  # Collect papers from last 3 years
+  max_per_query: 200  # Max papers per search query
   
-  # Virtual Cell specific queries
-  # Edit these to customize your focus
+  # Virtual Cell specific queries (customize as needed)
   queries:
     - "virtual cell modeling"
     - "digital twin cell"

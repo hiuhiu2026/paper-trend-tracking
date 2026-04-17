@@ -29,13 +29,13 @@ if str(src_path) not in sys.path:
 
 try:
     from .data_collector import DataCollector, Paper
-    from .keyword_extractor import create_extractor
+    from .enhanced_keyword_extractor import create_deepseek_extractor
     from .network_builder import NetworkBuilder, TrendAnalyzer
     from .visualization import NetworkVisualizer, TrendDashboard
     from .database import DatabaseManager, PaperModel, KeywordModel
 except ImportError:
     from data_collector import DataCollector, Paper
-    from keyword_extractor import create_extractor
+    from enhanced_keyword_extractor import create_deepseek_extractor
     from network_builder import NetworkBuilder, TrendAnalyzer
     from visualization import NetworkVisualizer, TrendDashboard
     from database import DatabaseManager, PaperModel, KeywordModel
@@ -166,13 +166,34 @@ class VirtualCellTracker:
             use_semantic_scholar=False
         )
         
-        self.extractor = create_extractor('yake', config={
-            'num_keywords': 10
-        })
+        # Initialize DeepSeek extractor (LLM-only, no pattern matching)
+        llm_config = self.config.get('llm', {})
+        self.extractor = None
+        self.deepseek_enabled = False
         
-        # LLM for summarization (optional)
+        if llm_config.get('enabled') and llm_config.get('provider') == 'deepseek':
+            api_key = llm_config.get('api_key')
+            if api_key and api_key != 'YOUR_API_KEY_HERE':
+                try:
+                    self.extractor = create_deepseek_extractor(
+                        api_key=api_key,
+                        model=llm_config.get('model', 'deepseek-chat'),
+                        base_url=llm_config.get('base_url', 'https://api.deepseek.com')
+                    )
+                    self.deepseek_enabled = True
+                    logger.info("✅ DeepSeek-powered keyword extraction enabled")
+                except Exception as e:
+                    logger.warning(f"⚠️  Failed to initialize DeepSeek: {e}. Falling back to pattern matching.")
+        
+        if not self.extractor:
+            # Fallback to basic keyword extractor if DeepSeek not available
+            from .keyword_extractor import create_extractor as create_basic_extractor
+            self.extractor = create_basic_extractor('yake', config={'num_keywords': 10})
+            logger.warning("⚠️  Using basic keyword extraction (enable DeepSeek for better results)")
+        
+        # LLM for summarization (separate from keyword extraction)
         self.llm_enabled = False
-        if self.config.get('llm', {}).get('enabled', False):
+        if llm_config.get('enabled') and llm_config.get('api_key') and llm_config.get('api_key') != 'YOUR_API_KEY_HERE':
             self._init_llm()
         
         logger.info("Virtual Cell Tracker initialized")
@@ -502,9 +523,19 @@ Keep it concise and professional."""
                 # If no keywords from source, extract from title/abstract
                 if not keywords_to_add and (paper.title or paper.abstract):
                     try:
-                        text = f"{paper.title}. {paper.abstract}"
-                        extracted = self.extractor.extract(text, max_keywords=10)
-                        keywords_to_add = [kw.keyword for kw in extracted]
+                        if self.deepseek_enabled and hasattr(self.extractor, 'extract_keywords'):
+                            # Use DeepSeek LLM extraction (title and abstract separate)
+                            extracted = self.extractor.extract_keywords(
+                                title=paper.title or "",
+                                abstract=paper.abstract or "",
+                                max_keywords=10
+                            )
+                            keywords_to_add = [kw.keyword for kw in extracted]
+                        else:
+                            # Fallback to basic extraction
+                            text = f"{paper.title}. {paper.abstract}"
+                            extracted = self.extractor.extract(text, max_keywords=10)
+                            keywords_to_add = [kw.keyword for kw in extracted]
                         logger.debug(f"Extracted {len(keywords_to_add)} keywords for {paper.id}")
                     except Exception as e:
                         logger.debug(f"Keyword extraction failed for {paper.id}: {e}")
@@ -614,7 +645,33 @@ Keep it concise and professional."""
             except Exception as e:
                 logger.error(f"Error generating trend charts: {e}")
         
-        return snapshots, trends, visualizer
+        # DeepSeek Hot Topic Analysis (if enabled)
+        hot_topic_report = None
+        if self.deepseek_enabled and hasattr(self.extractor, 'analyze_hot_topics'):
+            try:
+                logger.info("\n🔥 Running DeepSeek hot topic analysis...")
+                # Get all keywords from database
+                all_keywords = session.query(KeywordModel.name).all()
+                all_keywords = [kw[0] for kw in all_keywords]
+                
+                # Analyze hot research directions
+                hot_topics = self.extractor.analyze_hot_topics(all_keywords, top_n=50)
+                
+                # Generate markdown report
+                hot_topic_report = self.extractor.generate_research_trend_report(hot_topics)
+                
+                # Save hot topic report
+                hot_topic_file = self.output_dir / "hot_topics.md"
+                with open(hot_topic_file, 'w', encoding='utf-8') as f:
+                    f.write(hot_topic_report)
+                logger.info(f"✅ Hot topic report saved: {hot_topic_file}")
+                
+            except Exception as e:
+                logger.error(f"Hot topic analysis failed: {e}")
+                import traceback
+                traceback.print_exc()
+        
+        return snapshots, trends, visualizer, hot_topic_report
     
     def run(self, days_back: int = 3, max_per_query: int = 50, output_file: str = None, 
             build_network: bool = True, time_window: str = 'week'):
@@ -669,14 +726,20 @@ Keep it concise and professional."""
             logger.info("  BUILDING NETWORK & TRENDS")
             logger.info("=" * 70)
             
-            snapshots, trends, visualizer = self.build_network_and_trends(
-                papers, time_window=time_window
-            )
+            result = self.build_network_and_trends(papers, time_window=time_window)
+            snapshots, trends, visualizer, hot_topic_report = result
             
             if snapshots and trends:
                 logger.info(f"✅ Network built: {len(snapshots)} snapshots")
                 logger.info(f"✅ Trends analyzed: {len(trends)} trending keywords")
                 logger.info(f"📈 Visualizations saved to: {self.output_dir / 'vc_visualizations'}")
+                
+                # Add hot topic report to main report if available
+                if hot_topic_report:
+                    with open(output_file, 'a', encoding='utf-8') as f:
+                        f.write("\n\n")
+                        f.write(hot_topic_report)
+                    logger.info(f"🔥 Hot topic analysis added to report")
                 
                 # Add network info to report
                 network_info = []
