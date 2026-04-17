@@ -22,6 +22,13 @@ try:
 except ImportError:
     HAS_OPENAI = False
 
+# DeepSeek uses OpenAI-compatible API
+try:
+    from openai import OpenAI
+    HAS_OPENAI_CLIENT = True
+except ImportError:
+    HAS_OPENAI_CLIENT = False
+
 
 @dataclass
 class EnhancedKeywordResult:
@@ -61,7 +68,15 @@ class EnhancedAIVCKeywordExtractor:
         'novel', 'new', 'improved', 'efficient', 'high', 'large',
         'single', 'multi', 'integrated', 'computational', 'biological',
         'molecular', 'cellular', 'dynamic', 'spatial', 'temporal',
-        'network', 'pathway', 'signaling', 'regulation', 'interaction'
+        'network', 'pathway', 'signaling', 'regulation', 'interaction',
+        # Additional generic terms for stricter filtering
+        'framework', 'pipeline', 'workflow', 'platform', 'tool',
+        'application', 'performance', 'evaluation', 'experiment',
+        'result', 'finding', 'observation', 'hypothesis', 'theory',
+        'algorithm', 'technique', 'strategy', 'process', 'mechanism',
+        'function', 'structure', 'organization', 'architecture',
+        'prediction', 'classification', 'clustering', 'optimization',
+        'learning', 'training', 'inference', 'feature', 'representation'
     }
     
     # Specific technical phrases to PRIORITIZE
@@ -72,6 +87,10 @@ class EnhancedAIVCKeywordExtractor:
         r'\b(reinforcement learning|RL|policy gradient|Q-learning|actor-critic)\b',
         r'\b(foundation model|large language model|LLM|pre-trained model|fine-tuning)\b',
         r'\b(multi-modal|multimodal|cross-modal|modality alignment)\b',
+        r'\b(graph attention network|message passing neural network|MPNN)\b',
+        r'\b(contrastive learning|self-supervised learning|masked autoencoder)\b',
+        r'\b(mixture of experts|MoE|sparse MoE|switch transformer)\b',
+        r'\b(retrieval-augmented generation|RAG|knowledge-grounded)\b',
         
         # Cell Modeling (specific)
         r'\b(whole-cell model|whole cell simulation|digital twin|virtual cell)\b',
@@ -79,23 +98,38 @@ class EnhancedAIVCKeywordExtractor:
         r'\b(ODE|PDE|stochastic simulation|Gillespie|chemical master equation)\b',
         r'\b(agent-based|ABM|cellular automata|particle-based)\b',
         r'\b(metabolic model|constraint-based|FBA|flux balance)\b',
+        r'\b(mechanistic model|physics-informed|hybrid model|neural ODE)\b',
+        r'\b(whole-cell modeling|E-CELL|virtual cell platform)\b',
+        r'\b(cell cycle model|signaling pathway model|gene regulatory network)\b',
         
         # Omics & Data (specific)
         r'\b(single-cell RNA-seq|scRNA-seq|spatial transcriptomics|Visium)\b',
         r'\b(multi-omics|integrated omics|transcriptomics|proteomics|metabolomics)\b',
         r'\b(perturbation screen|CRISPR screen|drug response|dose-response)\b',
         r'\b(cell painting|high-content imaging|phenotypic profiling)\b',
+        r'\b(CITE-seq|scATAC-seq|multiome|10x Genomics|Drop-seq)\b',
+        r'\b(spatial proteomics|imaging mass cytometry|CODEX|MIBI)\b',
+        r'\b(long-read sequencing|PacBio|Nanopore|isoform sequencing)\b',
         
         # Applications (specific)
         r'\b(drug discovery|virtual screening|target identification|lead optimization)\b',
         r'\b(toxicity prediction|ADMET|pharmacokinetics|pharmacodynamics)\b',
         r'\b(disease modeling|cancer model|patient-specific|personalized medicine)\b',
         r'\b(gene therapy|cell therapy|synthetic biology|gene circuit)\b',
+        r'\b(biomarker discovery|patient stratification|clinical trial simulation)\b',
+        r'\b(combination therapy|drug synergy|polypharmacology)\b',
         
         # Evaluation (specific)
         r'\b(zero-shot|few-shot|in-context learning|emergent ability)\b',
         r'\b(out-of-distribution|OOD|generalization|robustness)\b',
         r'\b(interpretability|explainability|XAI|attention visualization)\b',
+        r'\b(calibration|uncertainty quantification|Bayesian neural network)\b',
+        
+        # Specific AIVC terminology
+        r'\b(AI virtual cell|AIVC|cell foundation model|CellFM)\b',
+        r'\b(cell embedding|cell representation|latent space of cells)\b',
+        r'\b(perturbation prediction|drug response prediction|genetic perturbation)\b',
+        r'\b(cell state transition|trajectory inference|pseudotime analysis)\b',
     ]
     
     # Category mappings
@@ -113,16 +147,31 @@ class EnhancedAIVCKeywordExtractor:
         
         Args:
             llm_config: Optional LLM configuration for hot topic analysis
-                {'enabled': True, 'api_key': '...', 'model': 'gpt-4o-mini'}
+                {
+                    'enabled': True,
+                    'provider': 'openai' | 'deepseek',
+                    'api_key': '...',  # Leave empty as placeholder to paste later
+                    'model': 'gpt-4o-mini' | 'deepseek-chat',
+                    'base_url': '...'  # Optional, for DeepSeek: https://api.deepseek.com
+                }
         """
         self.llm_config = llm_config or {'enabled': False}
         self.llm_client = None
+        self.llm_provider = self.llm_config.get('provider', 'openai')
         
-        if self.llm_config.get('enabled') and HAS_OPENAI:
+        if self.llm_config.get('enabled') and HAS_OPENAI_CLIENT:
             api_key = self.llm_config.get('api_key')
-            if api_key:
-                self.llm_client = openai.OpenAI(api_key=api_key)
-                logger.info("✅ LLM-based hot topic analysis enabled")
+            if api_key and api_key != 'YOUR_API_KEY_HERE':
+                # Configure client based on provider
+                if self.llm_provider == 'deepseek':
+                    base_url = self.llm_config.get('base_url', 'https://api.deepseek.com')
+                    self.llm_client = OpenAI(api_key=api_key, base_url=base_url)
+                    logger.info(f"✅ DeepSeek LLM hot topic analysis enabled (model: {self.llm_config.get('model', 'deepseek-chat')})")
+                else:
+                    self.llm_client = OpenAI(api_key=api_key)
+                    logger.info(f"✅ OpenAI LLM hot topic analysis enabled (model: {self.llm_config.get('model', 'gpt-4o-mini')})")
+            elif api_key == 'YOUR_API_KEY_HERE':
+                logger.warning("⚠️  LLM enabled but API key is placeholder. Paste your key in config to enable.")
             else:
                 logger.warning("⚠️  LLM enabled but no API key provided")
     
@@ -318,7 +367,7 @@ Format as JSON: {{"keyword": {{"hot": true/false, "importance": "...", "trend": 
 """
             
             response = self.llm_client.chat.completions.create(
-                model=self.llm_config.get('model', 'gpt-4o-mini'),
+                model=self.llm_config.get('model', 'deepseek-chat' if self.llm_provider == 'deepseek' else 'gpt-4o-mini'),
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.3,
                 max_tokens=1000

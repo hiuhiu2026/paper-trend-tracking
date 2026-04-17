@@ -148,6 +148,46 @@ When LLM is configured, the report includes:
 
 ---
 
+## 🆕 DeepSeek API Support (Updated 2026-04-17)
+
+The enhanced extractor now supports **DeepSeek API** as an alternative to OpenAI:
+
+### Configuration
+
+```yaml
+llm:
+  enabled: true
+  provider: deepseek  # Options: 'openai' or 'deepseek'
+  model: deepseek-chat
+  api_key: YOUR_API_KEY_HERE  # 🔑 Get from: https://platform.deepseek.com/api-keys
+  base_url: https://api.deepseek.com
+```
+
+### Benefits
+
+- **Cost-effective**: DeepSeek is significantly cheaper than GPT-4
+- **OpenAI-compatible**: Uses same API format, easy to switch
+- **Good for technical analysis**: Handles scientific text well
+- **No geo-restrictions**: Works from more regions than some providers
+
+### Switching Between Providers
+
+```yaml
+# Use DeepSeek
+llm:
+  provider: deepseek
+  model: deepseek-chat
+  api_key: sk-xxxxx  # Your DeepSeek key
+
+# Or use OpenAI
+llm:
+  provider: openai
+  model: gpt-4o-mini
+  api_key: sk-xxxxx  # Your OpenAI key
+```
+
+---
+
 ## 🚀 Usage
 
 ### Run with Enhanced Keywords
@@ -221,5 +261,28 @@ CATEGORY_PATTERNS = {
 
 ---
 
+## 📊 Network Visualization Improvements (Updated 2026-04-17)
+
+### Node Size Optimization
+
+Fixed oversized nodes in network visualization:
+
+**Before:**
+- Node size: `degree * 100` (uncapped)
+- Result: Large nodes overlapping, hard to read
+
+**After:**
+- Node size: `degree * 30` with min/max caps
+- Minimum: 150px (readable)
+- Maximum: 800px (prevents overlap)
+- Smaller font (9pt) and thinner colorbar
+
+### Configuration
+
+No config changes needed—improvements are automatic in `src/visualization.py`.
+
+---
+
 **Created:** 2026-04-16  
-**Version:** 1.0
+**Updated:** 2026-04-17  
+**Version:** 1.1

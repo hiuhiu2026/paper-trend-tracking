@@ -67,7 +67,11 @@ class NetworkVisualizer:
         node_x = [pos[node][0] for node in G.nodes()]
         node_y = [pos[node][1] for node in G.nodes()]
         node_labels = list(G.nodes())
-        node_sizes = [degrees[node] * 100 for node in G.nodes()]
+        
+        # Scale node sizes with a smaller multiplier and cap for better visibility
+        base_sizes = [degrees[node] * 30 for node in G.nodes()]  # Reduced from 100 to 30
+        node_sizes = [min(size, 800) for size in base_sizes]  # Cap max size at 800 (was uncapped)
+        node_sizes = [max(size, 150) for size in node_sizes]  # Min size for readability
         
         # Create node trace
         node_trace = go.Scatter(
@@ -77,7 +81,7 @@ class NetworkVisualizer:
             hoverinfo='text',
             text=node_labels,
             textposition="middle center",
-            textfont=dict(size=10, color='white'),
+            textfont=dict(size=9, color='white'),  # Slightly smaller font
             marker=dict(
                 showscale=True,
                 colorscale='Viridis',
@@ -85,7 +89,7 @@ class NetworkVisualizer:
                 color=node_sizes,
                 size=node_sizes,
                 colorbar=dict(
-                    thickness=15,
+                    thickness=12,  # Thinner colorbar
                     title=dict(text='Degree', side='right'),
                     xanchor='left',
                 ),

@@ -30,12 +30,14 @@ if str(src_path) not in sys.path:
 try:
     from .data_collector import DataCollector, Paper
     from .keyword_extractor import create_extractor
+    from .enhanced_keyword_extractor import create_enhanced_extractor
     from .network_builder import NetworkBuilder, TrendAnalyzer
     from .visualization import NetworkVisualizer, TrendDashboard
     from .database import DatabaseManager, PaperModel, KeywordModel
 except ImportError:
     from data_collector import DataCollector, Paper
     from keyword_extractor import create_extractor
+    from enhanced_keyword_extractor import create_enhanced_extractor
     from network_builder import NetworkBuilder, TrendAnalyzer
     from visualization import NetworkVisualizer, TrendDashboard
     from database import DatabaseManager, PaperModel, KeywordModel
@@ -180,13 +182,13 @@ class VirtualCellTracker:
             use_semantic_scholar=False
         )
         
-        self.extractor = create_extractor('yake', config={
-            'num_keywords': 10
-        })
+        # Use enhanced keyword extractor with LLM config for hot topic analysis
+        llm_config = self.config.get('llm', {})
+        self.extractor = create_enhanced_extractor(llm_config=llm_config)
         
-        # LLM for summarization (optional)
+        # LLM for summarization (optional, separate from hot topic analysis)
         self.llm_enabled = False
-        if self.config.get('llm', {}).get('enabled', False):
+        if llm_config.get('enabled', False) and llm_config.get('api_key') and llm_config.get('api_key') != 'YOUR_API_KEY_HERE':
             self._init_llm()
         
         logger.info("Virtual Cell Tracker initialized")
@@ -199,17 +201,25 @@ class VirtualCellTracker:
         return {}
     
     def _init_llm(self):
-        """Initialize LLM for summarization"""
+        """Initialize LLM for summarization (supports OpenAI and DeepSeek)"""
         try:
             from openai import OpenAI
             
-            api_key = self.config.get('llm', {}).get('api_key')
-            if api_key:
-                self.llm_client = OpenAI(api_key=api_key)
+            llm_config = self.config.get('llm', {})
+            api_key = llm_config.get('api_key')
+            provider = llm_config.get('provider', 'openai')
+            
+            if api_key and api_key != 'YOUR_API_KEY_HERE':
+                if provider == 'deepseek':
+                    base_url = llm_config.get('base_url', 'https://api.deepseek.com')
+                    self.llm_client = OpenAI(api_key=api_key, base_url=base_url)
+                    logger.info(f"✅ DeepSeek LLM summarization enabled (model: {llm_config.get('model', 'deepseek-chat')})")
+                else:
+                    self.llm_client = OpenAI(api_key=api_key)
+                    logger.info(f"✅ OpenAI LLM summarization enabled (model: {llm_config.get('model', 'gpt-4o-mini')})")
                 self.llm_enabled = True
-                logger.info("LLM summarization enabled")
             else:
-                logger.warning("LLM API key not configured")
+                logger.warning("⚠️  LLM API key not configured or is placeholder")
         except ImportError:
             logger.warning("OpenAI not installed. LLM summarization disabled.")
     
@@ -288,8 +298,11 @@ Please output in the following format (in Chinese):
 
 Keep it concise and professional."""
 
+            llm_config = self.config.get('llm', {})
+            model = llm_config.get('model', 'deepseek-chat' if llm_config.get('provider') == 'deepseek' else 'gpt-4o-mini')
+            
             response = self.llm_client.chat.completions.create(
-                model="gpt-4o-mini",
+                model=model,
                 messages=[
                     {"role": "system", "content": "You are a research assistant specializing in computational biology and virtual cell modeling."},
                     {"role": "user", "content": prompt}

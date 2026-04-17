@@ -4,12 +4,19 @@
 api_keys:
   pubmed: null  # https://www.ncbi.nlm.nih.gov/account/
 
-# LLM Configuration (optional, for auto-summaries)
+# LLM Configuration (optional, for auto-summaries and hot topic analysis)
+# Supports OpenAI and DeepSeek (OpenAI-compatible API)
 llm:
-  enabled: false
-  provider: openai
-  model: gpt-4o-mini
-  api_key: null  # https://platform.openai.com/api-keys
+  enabled: false  # Set to true to enable LLM features
+  provider: deepseek  # Options: 'openai' or 'deepseek'
+  model: deepseek-chat  # Options: 'gpt-4o-mini' (OpenAI) or 'deepseek-chat' (DeepSeek)
+  api_key: YOUR_API_KEY_HERE  # 🔑 PASTE YOUR DEEPSEEK KEY HERE: https://platform.deepseek.com/api-keys
+  base_url: https://api.deepseek.com  # DeepSeek API endpoint (only needed for DeepSeek)
+  
+  # OpenAI alternative (uncomment to use instead of DeepSeek)
+  # provider: openai
+  # model: gpt-4o-mini
+  # api_key: null  # https://platform.openai.com/api-keys
 
 # Collection Settings
 collection:
