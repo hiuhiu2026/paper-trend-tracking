@@ -1,216 +1,90 @@
 #!/usr/bin/env python3
 """
-Test Keyword Extraction
+Test DeepSeek Keyword Extraction
 
-Demonstrates different extraction methods on sample papers.
+Run this to debug keyword extraction issues.
 """
 
-import sys
+import yaml
 from pathlib import Path
+from src.enhanced_keyword_extractor import create_deepseek_extractor
 
-# Add src to path
-sys.path.insert(0, str(Path(__file__).parent / 'src'))
+# Load config
+config_path = Path("config.virtualcell.yaml")
+with open(config_path) as f:
+    config = yaml.safe_load(f)
 
-from keyword_extractor import (
-    create_extractor,
-    YakeExtractor,
-    TFIDFExtractor,
-    HybridExtractor,
-    KeywordExtractorFactory
+llm_config = config.get('llm', {})
+
+if not llm_config.get('enabled'):
+    print("❌ LLM not enabled in config.virtualcell.yaml")
+    print("Set llm.enabled: true and add your API key")
+    exit(1)
+
+api_key = llm_config.get('api_key')
+if not api_key or api_key == 'YOUR_API_KEY_HERE':
+    print("❌ API key not configured")
+    print("Edit config.virtualcell.yaml and paste your DeepSeek API key")
+    exit(1)
+
+# Initialize extractor
+print(f"Initializing DeepSeek extractor with model: {llm_config.get('model', 'deepseek-chat')}")
+extractor = create_deepseek_extractor(
+    api_key=api_key,
+    model=llm_config.get('model', 'deepseek-chat'),
+    base_url=llm_config.get('base_url', 'https://api.deepseek.com')
 )
 
+# Test with a real paper
+test_title = "AI-driven multiscale virtual plant cell modeling: from molecular mechanisms to tissue functions"
+test_abstract = """
+We present a novel foundation model approach for whole-cell simulation that integrates 
+single-cell RNA-seq data with spatial transcriptomics. Our transformer-based architecture 
+enables cross-modal alignment and zero-shot prediction of cell state transitions. The 
+model was trained on 10 million cells from 50 tissues and achieves state-of-the-art 
+performance on perturbation response prediction. Our approach combines graph neural 
+networks for molecular representation with variational autoencoders for dimensionality 
+reduction, enabling interpretable cell embeddings.
+"""
 
-def test_yake():
-    """Test YAKE extraction"""
-    print("\n" + "=" * 60)
-    print("Testing YAKE Extractor")
-    print("=" * 60)
-    
-    sample_abstract = """
-    Background: Machine learning (ML) has emerged as a transformative technology 
-    in drug discovery and development. Traditional drug discovery processes are 
-    time-consuming and expensive, often taking over 10 years and billions of 
-    dollars to bring a new drug to market.
-    
-    Methods: We developed a deep learning framework using graph neural networks 
-    (GNNs) to predict molecular properties including solubility, toxicity, and 
-    binding affinity. Our model was trained on ChEMBL and PubChem databases 
-    containing over 2 million compounds.
-    
-    Results: The GNN model achieved 94% accuracy in predicting drug-target 
-    interactions and identified 15 novel drug candidates for Alzheimer's disease. 
-    Virtual screening of 500,000 compounds took only 48 hours compared to 
-    months using traditional methods.
-    
-    Conclusions: Deep learning approaches can significantly accelerate early-stage 
-    drug discovery and reduce costs. Our open-source framework is available at 
-    github.com/example/drug-ml.
-    """
-    
-    extractor = create_extractor('yake', config={
-        'max_ngram_size': 3,
-        'num_keywords': 10
-    })
-    
-    keywords = extractor.extract(sample_abstract, max_keywords=10)
-    
-    print(f"\nExtracted {len(keywords)} keywords:\n")
+print("\n" + "=" * 70)
+print("TEST PAPER")
+print("=" * 70)
+print(f"Title: {test_title}")
+print(f"Abstract: {test_abstract[:200]}...")
+
+print("\n" + "=" * 70)
+print("EXTRACTING KEYWORDS")
+print("=" * 70)
+
+# Run extraction
+keywords = extractor.extract_keywords(test_title, test_abstract, max_keywords=10)
+
+print(f"\n✅ Extracted {len(keywords)} keywords:\n")
+
+for i, kw in enumerate(keywords, 1):
+    print(f"{i}. {kw.keyword}")
+    print(f"   Category: {kw.category}")
+    print(f"   Specificity: {kw.specificity_score:.2f}")
+    print(f"   Relevance: {kw.relevance_score:.2f}")
+    print(f"   Confidence: {kw.confidence:.2f}")
+    print()
+
+if not keywords:
+    print("❌ No keywords extracted! Check the error logs above.")
+    print("\n💡 Tips:")
+    print("   1. Check your API key is valid")
+    print("   2. Check network connectivity")
+    print("   3. Try a shorter abstract")
+    print("   4. Check DeepSeek API status")
+
+# Save test output
+with open("test_keyword_extraction_output.md", "w") as f:
+    f.write("# DeepSeek Keyword Extraction Test\n\n")
+    f.write(f"**Title:** {test_title}\n\n")
+    f.write(f"**Abstract:** {test_abstract}\n\n")
+    f.write("## Extracted Keywords\n\n")
     for i, kw in enumerate(keywords, 1):
-        print(f"  {i:2d}. {kw.keyword:40s} (score: {kw.score:.4f})")
-    
-    return keywords
+        f.write(f"{i}. **{kw.keyword}** (Category: {kw.category}, Specificity: {kw.specificity_score:.2f})\n")
 
-
-def test_tfidf():
-    """Test TF-IDF extraction"""
-    print("\n" + "=" * 60)
-    print("Testing TF-IDF Extractor")
-    print("=" * 60)
-    
-    # Need multiple documents to fit TF-IDF
-    documents = [
-        """
-        Machine learning for drug discovery: predicting molecular properties 
-        using deep neural networks. We present methods for virtual screening 
-        and drug-target interaction prediction.
-        """,
-        """
-        Clinical trial design using artificial intelligence. AI-powered 
-        patient recruitment and outcome prediction for pharmaceutical research.
-        """,
-        """
-        Natural language processing in biomedical literature. Mining PubMed 
-        for drug-drug interactions and adverse event detection.
-        """,
-        """
-        Graph neural networks for molecular property prediction. Deep learning 
-        on chemical structures for drug discovery applications.
-        """,
-        """
-        Reinforcement learning for de novo drug design. Generative models 
-        creating novel molecular structures with desired properties.
-        """
-    ]
-    
-    extractor = create_extractor('tfidf', config={
-        'max_features': 5000,
-        'min_df': 1,
-        'max_df': 0.9,
-        'ngram_range': [1, 2]
-    })
-    
-    print("\nFitting TF-IDF on corpus...")
-    extractor.fit(documents)
-    
-    test_text = """
-    Our machine learning model predicts drug-target interactions using 
-    deep neural networks trained on molecular structures. The system 
-    enables rapid virtual screening of compound libraries.
-    """
-    
-    keywords = extractor.extract(test_text, max_keywords=8)
-    
-    print(f"\nExtracted {len(keywords)} keywords:\n")
-    for i, kw in enumerate(keywords, 1):
-        print(f"  {i:2d}. {kw.keyword:40s} (score: {kw.score:.4f})")
-    
-    return keywords
-
-
-def test_custom_extractor():
-    """Test registering and using a custom extractor"""
-    print("\n" + "=" * 60)
-    print("Testing Custom Extractor Registration")
-    print("=" * 60)
-    
-    from keyword_extractor import BaseKeywordExtractor, KeywordResult
-    
-    class SimpleWordExtractor(BaseKeywordExtractor):
-        """Simple extractor that just returns most frequent words"""
-        
-        def extract(self, text: str, max_keywords: int = 10):
-            from collections import Counter
-            import re
-            
-            # Simple word frequency
-            words = re.findall(r'\b[a-zA-Z]{4,}\b', text.lower())
-            word_counts = Counter(words)
-            
-            # Filter common words
-            stop_words = {'using', 'present', 'methods', 'results', 'conclusions'}
-            filtered = [(w, c) for w, c in word_counts.most_common(20) if w not in stop_words]
-            
-            return [
-                KeywordResult(
-                    keyword=word,
-                    score=count / len(words),
-                    occurrences=count,
-                    positions=[],
-                    method='SimpleWord'
-                )
-                for word, count in filtered[:max_keywords]
-            ]
-        
-        def batch_extract(self, texts: list, max_keywords: int = 10):
-            return [self.extract(text, max_keywords) for text in texts]
-    
-    # Register custom extractor
-    KeywordExtractorFactory.register_extractor('simple', SimpleWordExtractor)
-    
-    # Use it
-    extractor = create_extractor('simple')
-    keywords = extractor.extract("Machine learning drug discovery using deep learning methods", max_keywords=5)
-    
-    print(f"\nCustom extractor keywords:\n")
-    for kw in keywords:
-        print(f"  - {kw.keyword} (score: {kw.score:.4f})")
-
-
-def test_batch_extraction():
-    """Test batch extraction performance"""
-    import time
-    
-    print("\n" + "=" * 60)
-    print("Testing Batch Extraction Performance")
-    print("=" * 60)
-    
-    # Sample abstracts
-    abstracts = [
-        "Deep learning for protein structure prediction using AlphaFold and neural networks.",
-        "Machine learning in clinical trials: patient selection and outcome prediction.",
-        "Natural language processing for mining biomedical literature and electronic health records.",
-        "Graph neural networks for molecular property prediction and drug discovery.",
-        "Reinforcement learning approaches for automated synthesis planning in chemistry."
-    ] * 10  # 50 abstracts
-    
-    extractor = create_extractor('yake')
-    
-    print(f"\nProcessing {len(abstracts)} abstracts...")
-    start = time.time()
-    
-    results = extractor.batch_extract(abstracts, max_keywords=5)
-    
-    elapsed = time.time() - start
-    rate = len(abstracts) / elapsed
-    
-    print(f"  Time: {elapsed:.2f}s")
-    print(f"  Rate: {rate:.1f} abstracts/second")
-    print(f"  Total keywords extracted: {sum(len(r) for r in results)}")
-
-
-def main():
-    """Run all tests"""
-    print("\n🧪 Keyword Extraction Tests\n")
-    
-    test_yake()
-    test_tfidf()
-    test_custom_extractor()
-    test_batch_extraction()
-    
-    print("\n" + "=" * 60)
-    print("✅ All tests complete!")
-    print("=" * 60 + "\n")
-
-
-if __name__ == "__main__":
-    main()
+print(f"\n✅ Test output saved to: test_keyword_extraction_output.md")
