@@ -193,6 +193,7 @@ Analyze and identify hot research directions (JSON only):"""
             
             # Parse response
             content = response.choices[0].message.content.strip()
+            logger.debug(f"DeepSeek extraction response: {len(content)} chars")
             
             # Extract JSON from response (handle markdown code blocks)
             json_match = re.search(r'\{[\s\S]*\}', content)
@@ -201,11 +202,36 @@ Analyze and identify hot research directions (JSON only):"""
             
             result = json.loads(content)
             
+            # Validate structure
+            if not isinstance(result, dict):
+                logger.error(f"❌ Expected dict, got {type(result)}")
+                logger.debug(f"Raw response: {content[:500]}...")
+                return []
+            
+            # Handle different possible key names (keywords, extracted_keywords, items, etc.)
+            keywords_data = None
+            for key in ['keywords', 'extracted_keywords', 'items', 'keyword_list', 'results']:
+                if key in result:
+                    keywords_data = result[key]
+                    break
+            
+            if not keywords_data:
+                logger.error(f"❌ No keywords found in response. Keys: {list(result.keys())}")
+                logger.debug(f"Raw response: {content[:500]}...")
+                return []
+            
+            if not isinstance(keywords_data, list):
+                logger.error(f"❌ Expected list for keywords, got {type(keywords_data)}")
+                return []
+            
             # Convert to EnhancedKeywordResult objects
             keywords = []
-            for kw_data in result.get('keywords', [])[:max_keywords]:
+            for kw_data in keywords_data[:max_keywords]:
+                if not isinstance(kw_data, dict):
+                    logger.debug(f"⚠️  Skipping non-dict keyword data: {type(kw_data)}")
+                    continue
                 keywords.append(EnhancedKeywordResult(
-                    keyword=kw_data.get('keyword', ''),
+                    keyword=kw_data.get('keyword', '') or kw_data.get('text', '') or kw_data.get('name', ''),
                     specificity_score=kw_data.get('specificity', 0.8),
                     relevance_score=kw_data.get('relevance', 0.8),
                     category=kw_data.get('category', 'Other'),
@@ -219,10 +245,16 @@ Analyze and identify hot research directions (JSON only):"""
             
         except json.JSONDecodeError as e:
             logger.error(f"❌ Failed to parse DeepSeek response: {e}")
-            logger.debug(f"Raw response: {content[:500]}...")
+            logger.debug(f"Raw response: {content[:500] if 'content' in dir() else 'N/A'}...")
+            return []
+        except KeyError as e:
+            logger.error(f"❌ Missing expected key in response: {e}")
+            logger.debug(f"Raw response: {content[:500] if 'content' in dir() else 'N/A'}...")
             return []
         except Exception as e:
             logger.error(f"❌ DeepSeek extraction failed: {e}")
+            import traceback
+            traceback.print_exc()
             return []
     
     def analyze_hot_topics(self, all_keywords: List[str], top_n: int = 50) -> Dict:
