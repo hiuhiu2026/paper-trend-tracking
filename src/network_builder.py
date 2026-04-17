@@ -185,19 +185,11 @@ class NetworkBuilder:
         session = self.db.get_session()
         
         try:
-            # Get papers in this time window - use publication_date for historical trends
-            # This groups papers by when they were published, not when we collected them
+            # Get papers in this time window
             papers = session.query(PaperModel).filter(
-                PaperModel.publication_date >= start_date.strftime('%Y-%m-%d'),
-                PaperModel.publication_date <= end_date.strftime('%Y-%m-%d')
+                PaperModel.collected_at >= start_date,
+                PaperModel.collected_at <= end_date
             ).all()
-            
-            # If no papers found by publication_date, try collected_at (fallback)
-            if not papers:
-                papers = session.query(PaperModel).filter(
-                    PaperModel.collected_at >= start_date,
-                    PaperModel.collected_at <= end_date
-                ).all()
             
             if not papers:
                 logger.debug(f"  No papers in window {start_date.date()} - {end_date.date()}")
@@ -493,7 +485,7 @@ class TrendAnalyzer:
             limit: Maximum keywords to return
         
         Returns:
-            List of keyword trend data (ALWAYS returns data, even with limited snapshots)
+            List of keyword trend data
         """
         session = self.db.get_session()
         
@@ -504,20 +496,7 @@ class TrendAnalyzer:
             ).limit(n_snapshots).all()
             
             if not recent_snapshots:
-                logger.warning("No trend metrics found, returning top keywords by occurrence")
-                # Fallback: return top keywords by total occurrences
-                top_keywords = session.query(KeywordModel).order_by(
-                    KeywordModel.total_occurrences.desc()
-                ).limit(limit).all()
-                
-                return [{
-                    'keyword': kw.name,
-                    'occurrences': kw.total_occurrences or 0,
-                    'growth_rate': 0.0,
-                    'momentum': 0.0,
-                    'pagerank': 0.0,
-                    'degree': 0.0
-                } for kw in top_keywords]
+                return []
             
             # Get latest snapshot date
             latest_date = recent_snapshots[0][0]

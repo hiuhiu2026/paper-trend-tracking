@@ -4,27 +4,38 @@
 api_keys:
   pubmed: null  # https://www.ncbi.nlm.nih.gov/account/
 
-# LLM Configuration (optional, for auto-summaries and hot topic analysis)
-# Supports OpenAI and DeepSeek (OpenAI-compatible API)
+# ============================================================================
+# LLM Configuration - DEEPSEEK REQUIRED for keyword extraction
+# ============================================================================
+# This tracker uses DeepSeek LLM EXCLUSIVELY for:
+# 1. Extracting specific technical keywords from papers
+# 2. Identifying hot research directions and trends
+# 3. Generating insightful analysis reports
+#
+# ⚠️  Pattern matching has been REMOVED - DeepSeek is required for best results
+# ============================================================================
+
 llm:
-  enabled: false  # Set to true to enable LLM features
-  provider: deepseek  # Options: 'openai' or 'deepseek'
-  model: deepseek-chat  # Options: 'gpt-4o-mini' (OpenAI) or 'deepseek-chat' (DeepSeek)
-  api_key: YOUR_API_KEY_HERE  # 🔑 PASTE YOUR DEEPSEEK KEY HERE: https://platform.deepseek.com/api-keys
-  base_url: https://api.deepseek.com  # DeepSeek API endpoint (only needed for DeepSeek)
+  enabled: true  # ⚠️  MUST be true for keyword extraction to work
+  provider: deepseek  # Only 'deepseek' is supported (no OpenAI, no pattern matching)
+  model: deepseek-chat  # DeepSeek's flagship model
   
-  # OpenAI alternative (uncomment to use instead of DeepSeek)
-  # provider: openai
-  # model: gpt-4o-mini
-  # api_key: null  # https://platform.openai.com/api-keys
+  # 🔑 GET YOUR API KEY: https://platform.deepseek.com/api-keys
+  # Paste your key below between the quotes:
+  api_key: YOUR_API_KEY_HERE
+  
+  # DeepSeek API endpoint (do not change unless using a proxy)
+  base_url: https://api.deepseek.com
+  
+  # Optional: Enable paper summarization (uses same API key)
+  enable_summarization: true
 
 # Collection Settings
 collection:
-  days_back: 1095  # Collect papers from last 3 years (365 * 3 = 1095 days)
-  max_per_query: 200  # Max papers per search query (increased for historical collection)
+  days_back: 1095  # Collect papers from last 3 years
+  max_per_query: 200  # Max papers per search query
   
-  # Virtual Cell specific queries
-  # Edit these to customize your focus
+  # Virtual Cell specific queries (customize as needed)
   queries:
     - "virtual cell modeling"
     - "digital twin cell"

@@ -1,45 +1,41 @@
 #!/usr/bin/env python3
 """
-Enhanced Keyword Extractor for AIVC Research
+DeepSeek-Powered Keyword Extractor for AIVC Research
 
-Features:
-1. Filters out generic/uninsightful keywords
-2. Extracts specific technical phrases
-3. LLM-based hot topic identification
-4. Domain-aware keyword refinement
+This extractor uses DeepSeek LLM exclusively for:
+1. Extracting specific, technical keywords from papers
+2. Identifying hot research directions and trends
+3. Categorizing keywords by domain
+4. Filtering out generic terms
+
+NO pattern matching - all extraction is LLM-driven for maximum specificity.
 """
 
-import re
 from typing import List, Dict, Optional, Tuple
 from dataclasses import dataclass
 from loguru import logger
 import json
+import re
 
-# Try to import optional LLM dependencies
-try:
-    import openai
-    HAS_OPENAI = True
-except ImportError:
-    HAS_OPENAI = False
-
-# DeepSeek uses OpenAI-compatible API
+# Try to import OpenAI client (DeepSeek uses OpenAI-compatible API)
 try:
     from openai import OpenAI
-    HAS_OPENAI_CLIENT = True
+    HAS_CLIENT = True
 except ImportError:
-    HAS_OPENAI_CLIENT = False
+    HAS_CLIENT = False
+    logger.warning("⚠️  OpenAI package not installed. Install with: pip install openai")
 
 
 @dataclass
 class EnhancedKeywordResult:
-    """Enhanced keyword with domain specificity"""
+    """Keyword result with DeepSeek analysis"""
     keyword: str
     specificity_score: float  # How specific/technical (0-1)
     relevance_score: float    # Relevance to AIVC (0-1)
-    category: str             # Category (Method/Technique/Application/etc.)
-    is_hot_topic: bool        # Whether this is trending
-    llm_elaboration: str      # LLM-generated insight (optional)
-    original_phrase: str      # Original text span
+    category: str             # AI_Method / Modeling_Technique / Data_Technology / Application / Evaluation
+    is_hot_topic: bool        # Whether this is a trending research direction
+    llm_elaboration: str      # DeepSeek-generated insight about why this matters
+    confidence: float         # LLM confidence in this keyword (0-1)
     
     def to_dict(self) -> dict:
         return {
@@ -49,135 +45,128 @@ class EnhancedKeywordResult:
             'category': self.category,
             'hot_topic': self.is_hot_topic,
             'elaboration': self.llm_elaboration,
+            'confidence': self.confidence,
         }
 
 
-class EnhancedAIVCKeywordExtractor:
+class DeepSeekAIVCExtractor:
     """
-    Domain-specific keyword extractor for AI Virtual Cell research
+    DeepSeek-powered keyword extractor for AI Virtual Cell research
     
-    Filters generic terms and extracts specific, insightful keywords
+    Uses LLM to extract specific technical keywords and identify hot research directions.
+    NO pattern matching - everything is LLM-driven for maximum quality.
     """
     
-    # Generic terms to FILTER OUT (too general)
-    GENERIC_TERMS = {
-        'machine learning', 'deep learning', 'artificial intelligence',
-        'neural network', 'model', 'simulation', 'analysis', 'study',
-        'research', 'method', 'approach', 'system', 'data', 'cell',
-        'cells', 'protein', 'gene', 'expression', 'based', 'using',
-        'novel', 'new', 'improved', 'efficient', 'high', 'large',
-        'single', 'multi', 'integrated', 'computational', 'biological',
-        'molecular', 'cellular', 'dynamic', 'spatial', 'temporal',
-        'network', 'pathway', 'signaling', 'regulation', 'interaction',
-        # Additional generic terms for stricter filtering
-        'framework', 'pipeline', 'workflow', 'platform', 'tool',
-        'application', 'performance', 'evaluation', 'experiment',
-        'result', 'finding', 'observation', 'hypothesis', 'theory',
-        'algorithm', 'technique', 'strategy', 'process', 'mechanism',
-        'function', 'structure', 'organization', 'architecture',
-        'prediction', 'classification', 'clustering', 'optimization',
-        'learning', 'training', 'inference', 'feature', 'representation'
+    # System prompt for keyword extraction
+    EXTRACTION_PROMPT = """You are an expert in AI Virtual Cell (AIVC) research. Your task is to extract specific, technical keywords from scientific paper titles and abstracts.
+
+**CRITICAL RULES:**
+1. Extract ONLY specific technical terms - NO generic words like "machine learning", "model", "analysis", "cell", "protein"
+2. Focus on cutting-edge techniques and methods specific to AIVC
+3. Prefer multi-word phrases (2-5 words) over single words
+4. Extract 8-12 keywords maximum
+5. Each keyword must be actionable and insightful for tracking research trends
+
+**GOOD examples:**
+- "graph neural network for molecular representation"
+- "variational autoencoder for single-cell data"
+- "spatial transcriptomics integration"
+- "whole-cell metabolic modeling"
+- "foundation model pre-training on cell atlases"
+- "perturbation response prediction"
+- "cross-modal alignment of scRNA-seq and proteomics"
+
+**BAD examples (DO NOT extract):**
+- "machine learning" (too generic)
+- "cell model" (too vague)
+- "data analysis" (meaningless)
+- "novel approach" (not technical)
+- "protein expression" (too common)
+
+**Output format (JSON only, no explanation):**
+{
+  "keywords": [
+    {
+      "keyword": "specific technical phrase",
+      "category": "AI_Method|Modeling_Technique|Data_Technology|Application|Evaluation",
+      "specificity": 0.95,
+      "relevance": 0.90,
+      "confidence": 0.92
     }
-    
-    # Specific technical phrases to PRIORITIZE
-    SPECIFIC_PATTERNS = [
-        # AI Methods (specific)
-        r'\b(transformer|BERT|GPT|ViT|GNN|graph neural network|attention mechanism|self-attention)\b',
-        r'\b(variational autoencoder|VAE|diffusion model|generative model|flow-based model)\b',
-        r'\b(reinforcement learning|RL|policy gradient|Q-learning|actor-critic)\b',
-        r'\b(foundation model|large language model|LLM|pre-trained model|fine-tuning)\b',
-        r'\b(multi-modal|multimodal|cross-modal|modality alignment)\b',
-        r'\b(graph attention network|message passing neural network|MPNN)\b',
-        r'\b(contrastive learning|self-supervised learning|masked autoencoder)\b',
-        r'\b(mixture of experts|MoE|sparse MoE|switch transformer)\b',
-        r'\b(retrieval-augmented generation|RAG|knowledge-grounded)\b',
-        
-        # Cell Modeling (specific)
-        r'\b(whole-cell model|whole cell simulation|digital twin|virtual cell)\b',
-        r'\b(multi-scale|multiscale|cross-scale|hierarchical model)\b',
-        r'\b(ODE|PDE|stochastic simulation|Gillespie|chemical master equation)\b',
-        r'\b(agent-based|ABM|cellular automata|particle-based)\b',
-        r'\b(metabolic model|constraint-based|FBA|flux balance)\b',
-        r'\b(mechanistic model|physics-informed|hybrid model|neural ODE)\b',
-        r'\b(whole-cell modeling|E-CELL|virtual cell platform)\b',
-        r'\b(cell cycle model|signaling pathway model|gene regulatory network)\b',
-        
-        # Omics & Data (specific)
-        r'\b(single-cell RNA-seq|scRNA-seq|spatial transcriptomics|Visium)\b',
-        r'\b(multi-omics|integrated omics|transcriptomics|proteomics|metabolomics)\b',
-        r'\b(perturbation screen|CRISPR screen|drug response|dose-response)\b',
-        r'\b(cell painting|high-content imaging|phenotypic profiling)\b',
-        r'\b(CITE-seq|scATAC-seq|multiome|10x Genomics|Drop-seq)\b',
-        r'\b(spatial proteomics|imaging mass cytometry|CODEX|MIBI)\b',
-        r'\b(long-read sequencing|PacBio|Nanopore|isoform sequencing)\b',
-        
-        # Applications (specific)
-        r'\b(drug discovery|virtual screening|target identification|lead optimization)\b',
-        r'\b(toxicity prediction|ADMET|pharmacokinetics|pharmacodynamics)\b',
-        r'\b(disease modeling|cancer model|patient-specific|personalized medicine)\b',
-        r'\b(gene therapy|cell therapy|synthetic biology|gene circuit)\b',
-        r'\b(biomarker discovery|patient stratification|clinical trial simulation)\b',
-        r'\b(combination therapy|drug synergy|polypharmacology)\b',
-        
-        # Evaluation (specific)
-        r'\b(zero-shot|few-shot|in-context learning|emergent ability)\b',
-        r'\b(out-of-distribution|OOD|generalization|robustness)\b',
-        r'\b(interpretability|explainability|XAI|attention visualization)\b',
-        r'\b(calibration|uncertainty quantification|Bayesian neural network)\b',
-        
-        # Specific AIVC terminology
-        r'\b(AI virtual cell|AIVC|cell foundation model|CellFM)\b',
-        r'\b(cell embedding|cell representation|latent space of cells)\b',
-        r'\b(perturbation prediction|drug response prediction|genetic perturbation)\b',
-        r'\b(cell state transition|trajectory inference|pseudotime analysis)\b',
-    ]
-    
-    # Category mappings
-    CATEGORY_PATTERNS = {
-        'AI_Method': ['transformer', 'GNN', 'VAE', 'diffusion', 'foundation model', 'LLM'],
-        'Modeling_Technique': ['whole-cell', 'multi-scale', 'ODE', 'agent-based', 'FBA'],
-        'Data_Technology': ['scRNA-seq', 'spatial transcriptomics', 'multi-omics', 'cell painting'],
-        'Application': ['drug discovery', 'toxicity', 'disease modeling', 'gene therapy'],
-        'Evaluation': ['zero-shot', 'OOD', 'interpretability', 'generalization'],
+  ]
+}
+
+**Categories:**
+- AI_Method: Specific AI/ML techniques (transformer, GNN, VAE, diffusion, etc.)
+- Modeling_Technique: Cell modeling approaches (whole-cell, multi-scale, ODE, agent-based, etc.)
+- Data_Technology: Omics and data technologies (scRNA-seq, spatial transcriptomics, multi-omics, etc.)
+- Application: Research applications (drug discovery, disease modeling, toxicity prediction, etc.)
+- Evaluation: Evaluation methods (zero-shot, out-of-distribution, interpretability, etc.)
+
+---
+
+Title: {title}
+
+Abstract: {abstract}
+
+---
+
+Extract keywords (JSON only):"""
+
+    # Prompt for hot topic analysis across multiple papers
+    HOT_TOPIC_PROMPT = """You are an AI Virtual Cell (AIVC) research trend analyst. Analyze these keywords collected from recent AIVC literature and identify the hottest research directions.
+
+**Your task:**
+1. Identify 5-8 hot research directions (emerging trends)
+2. For each direction, list 3-5 related keywords
+3. Explain why this direction is important for AIVC
+4. Assess the trend stage (emerging/rapid growth/mature)
+5. Predict future research opportunities
+
+**Output format (JSON only):**
+{
+  "hot_directions": [
+    {
+      "direction_name": "Clear name for this research direction",
+      "keywords": ["keyword1", "keyword2", "keyword3"],
+      "importance": "Why this matters for AIVC (2-3 sentences)",
+      "trend_stage": "emerging|rapid growth|mature",
+      "future_opportunities": "What's next in this area (1-2 sentences)",
+      "heat_score": 0.95
     }
+  ],
+  "overall_trends": "Brief summary of the overall AIVC research landscape (2-3 sentences)"
+}
+
+**Keywords from recent papers:**
+{keywords}
+
+---
+
+Analyze and identify hot research directions (JSON only):"""
     
-    def __init__(self, llm_config: Dict = None):
+    def __init__(self, api_key: str, model: str = "deepseek-chat", base_url: str = "https://api.deepseek.com"):
         """
-        Initialize extractor
+        Initialize DeepSeek extractor
         
         Args:
-            llm_config: Optional LLM configuration for hot topic analysis
-                {
-                    'enabled': True,
-                    'provider': 'openai' | 'deepseek',
-                    'api_key': '...',  # Leave empty as placeholder to paste later
-                    'model': 'gpt-4o-mini' | 'deepseek-chat',
-                    'base_url': '...'  # Optional, for DeepSeek: https://api.deepseek.com
-                }
+            api_key: DeepSeek API key (required)
+            model: Model name (default: deepseek-chat)
+            base_url: API base URL (default: https://api.deepseek.com)
         """
-        self.llm_config = llm_config or {'enabled': False}
-        self.llm_client = None
-        self.llm_provider = self.llm_config.get('provider', 'openai')
+        if not HAS_CLIENT:
+            raise ImportError("OpenAI package required. Install: pip install openai")
         
-        if self.llm_config.get('enabled') and HAS_OPENAI_CLIENT:
-            api_key = self.llm_config.get('api_key')
-            if api_key and api_key != 'YOUR_API_KEY_HERE':
-                # Configure client based on provider
-                if self.llm_provider == 'deepseek':
-                    base_url = self.llm_config.get('base_url', 'https://api.deepseek.com')
-                    self.llm_client = OpenAI(api_key=api_key, base_url=base_url)
-                    logger.info(f"✅ DeepSeek LLM hot topic analysis enabled (model: {self.llm_config.get('model', 'deepseek-chat')})")
-                else:
-                    self.llm_client = OpenAI(api_key=api_key)
-                    logger.info(f"✅ OpenAI LLM hot topic analysis enabled (model: {self.llm_config.get('model', 'gpt-4o-mini')})")
-            elif api_key == 'YOUR_API_KEY_HERE':
-                logger.warning("⚠️  LLM enabled but API key is placeholder. Paste your key in config to enable.")
-            else:
-                logger.warning("⚠️  LLM enabled but no API key provided")
+        if not api_key or api_key == "YOUR_API_KEY_HERE":
+            raise ValueError("DeepSeek API key required. Get one from https://platform.deepseek.com/api-keys")
+        
+        self.client = OpenAI(api_key=api_key, base_url=base_url)
+        self.model = model
+        logger.info(f"✅ DeepSeek AIVC extractor initialized (model: {model})")
     
-    def extract_keywords(self, title: str, abstract: str, max_keywords: int = 15) -> List[EnhancedKeywordResult]:
+    def extract_keywords(self, title: str, abstract: str, max_keywords: int = 12) -> List[EnhancedKeywordResult]:
         """
-        Extract specific, insightful keywords from paper
+        Extract keywords using DeepSeek LLM
         
         Args:
             title: Paper title
@@ -185,231 +174,174 @@ class EnhancedAIVCKeywordExtractor:
             max_keywords: Maximum keywords to return
         
         Returns:
-            List of EnhancedKeywordResult, filtered and ranked
+            List of EnhancedKeywordResult objects
         """
-        text = f"{title}. {abstract}"
-        keywords = []
-        
-        # Step 1: Extract specific technical phrases
-        specific_keywords = self._extract_specific_phrases(text)
-        keywords.extend(specific_keywords)
-        
-        # Step 2: Extract compound technical terms (2-4 words)
-        compound_keywords = self._extract_compound_terms(title, abstract)
-        keywords.extend(compound_keywords)
-        
-        # Step 3: Filter out generic terms
-        filtered = self._filter_generic(keywords)
-        
-        # Step 4: Score and rank by specificity + relevance
-        scored = self._score_keywords(filtered)
-        
-        # Step 5: Take top keywords
-        top_keywords = sorted(scored, key=lambda x: x.specificity_score * 0.4 + x.relevance_score * 0.6, reverse=True)[:max_keywords]
-        
-        # Step 6: LLM-based hot topic identification (if enabled)
-        if self.llm_client:
-            top_keywords = self._identify_hot_topics(top_keywords)
-        
-        return top_keywords
-    
-    def _extract_specific_phrases(self, text: str) -> List[EnhancedKeywordResult]:
-        """Extract specific technical phrases matching known patterns"""
-        results = []
-        text_lower = text.lower()
-        
-        for pattern in self.SPECIFIC_PATTERNS:
-            matches = re.finditer(pattern, text_lower, re.IGNORECASE)
-            for match in matches:
-                phrase = match.group(0)
-                category = self._categorize_phrase(phrase)
-                
-                results.append(EnhancedKeywordResult(
-                    keyword=phrase,
-                    specificity_score=0.9,  # High specificity (matched known pattern)
-                    relevance_score=0.85,
-                    category=category,
-                    is_hot_topic=False,  # Will be updated by LLM
-                    llm_elaboration="",
-                    original_phrase=phrase
-                ))
-        
-        return results
-    
-    def _extract_compound_terms(self, title: str, abstract: str) -> List[EnhancedKeywordResult]:
-        """Extract compound technical terms (2-4 word phrases)"""
-        results = []
-        
-        # Focus on title for important terms
-        title_tokens = title.split()
-        for i in range(len(title_tokens) - 1):
-            for j in range(i + 2, min(i + 5, len(title_tokens) + 1)):
-                phrase = ' '.join(title_tokens[i:j])
-                if self._is_technical_phrase(phrase):
-                    results.append(EnhancedKeywordResult(
-                        keyword=phrase.lower(),
-                        specificity_score=0.7,
-                        relevance_score=0.75,
-                        category=self._categorize_phrase(phrase),
-                        is_hot_topic=False,
-                        llm_elaboration="",
-                        original_phrase=phrase
-                    ))
-        
-        return results
-    
-    def _is_technical_phrase(self, phrase: str) -> bool:
-        """Check if phrase is technical (not generic)"""
-        phrase_lower = phrase.lower()
-        
-        # Reject if contains generic words only
-        words = phrase_lower.split()
-        if all(w in self.GENERIC_TERMS for w in words):
-            return False
-        
-        # Accept if contains technical indicators
-        technical_indicators = [
-            'model', 'simulation', 'network', 'learning', 'based',
-            'omics', 'seq', 'RNA', 'cell', 'gene', 'protein',
-            'virtual', 'digital', 'twin', 'multi', 'scale'
-        ]
-        
-        return any(ind in phrase_lower for ind in technical_indicators)
-    
-    def _filter_generic(self, keywords: List[EnhancedKeywordResult]) -> List[EnhancedKeywordResult]:
-        """Remove generic/uninsightful keywords"""
-        filtered = []
-        seen = set()
-        
-        for kw in keywords:
-            kw_lower = kw.keyword.lower()
-            
-            # Skip if exact generic term
-            if kw_lower in self.GENERIC_TERMS:
-                continue
-            
-            # Skip if too short (1 word and generic)
-            if len(kw_lower.split()) == 1 and kw_lower in self.GENERIC_TERMS:
-                continue
-            
-            # Skip duplicates
-            if kw_lower in seen:
-                continue
-            seen.add(kw_lower)
-            
-            # Boost specificity score for longer phrases
-            if len(kw_lower.split()) >= 3:
-                kw.specificity_score = min(1.0, kw.specificity_score + 0.1)
-            
-            filtered.append(kw)
-        
-        return filtered
-    
-    def _score_keywords(self, keywords: List[EnhancedKeywordResult]) -> List[EnhancedKeywordResult]:
-        """Score keywords by specificity and AIVC relevance"""
-        for kw in keywords:
-            # Specificity: longer phrases = more specific
-            word_count = len(kw.keyword.split())
-            length_bonus = min(0.2, (word_count - 1) * 0.05)
-            kw.specificity_score = min(1.0, kw.specificity_score + length_bonus)
-            
-            # Relevance: boost for AIVC-specific terms
-            aivc_boosters = [
-                'virtual cell', 'digital twin', 'whole-cell', 'whole cell',
-                'AI virtual', 'foundation model', 'cell model', 'cell simulation'
-            ]
-            for booster in aivc_boosters:
-                if booster in kw.keyword.lower():
-                    kw.relevance_score = min(1.0, kw.relevance_score + 0.15)
-                    break
-        
-        return keywords
-    
-    def _categorize_phrase(self, phrase: str) -> str:
-        """Categorize phrase into domain category"""
-        phrase_lower = phrase.lower()
-        
-        for category, keywords in self.CATEGORY_PATTERNS.items():
-            if any(kw in phrase_lower for kw in keywords):
-                return category
-        
-        # Default categorization
-        if any(w in phrase_lower for w in ['model', 'simulation', 'ODE', 'agent']):
-            return 'Modeling_Technique'
-        elif any(w in phrase_lower for w in ['learning', 'neural', 'transformer', 'AI']):
-            return 'AI_Method'
-        elif any(w in phrase_lower for w in ['omics', 'seq', 'RNA', 'proteomics']):
-            return 'Data_Technology'
-        elif any(w in phrase_lower for w in ['drug', 'therapy', 'disease', 'toxicity']):
-            return 'Application'
-        else:
-            return 'Other'
-    
-    def _identify_hot_topics(self, keywords: List[EnhancedKeywordResult]) -> List[EnhancedKeywordResult]:
-        """Use LLM to identify hot topics and generate elaborations"""
-        if not self.llm_client:
-            return keywords
-        
         try:
-            # Prepare keywords for LLM analysis
-            kw_list = [kw.keyword for kw in keywords[:10]]  # Top 10
+            # Prepare prompt
+            prompt = self.EXTRACTION_PROMPT.format(title=title, abstract=abstract)
             
-            prompt = f"""You are an AI Virtual Cell (AIVC) research expert. Analyze these keywords from recent AIVC literature and identify hot topics.
-
-Keywords: {json.dumps(kw_list)}
-
-For each keyword, provide:
-1. Is this a hot topic? (yes/no)
-2. Why is it important for AIVC? (1 sentence)
-3. What's the research trend? (emerging/mature/declining)
-
-Format as JSON: {{"keyword": {{"hot": true/false, "importance": "...", "trend": "..."}}}}
-"""
-            
-            response = self.llm_client.chat.completions.create(
-                model=self.llm_config.get('model', 'deepseek-chat' if self.llm_provider == 'deepseek' else 'gpt-4o-mini'),
-                messages=[{"role": "user", "content": prompt}],
+            # Call DeepSeek
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": "You are an AIVC research expert. Output JSON only, no explanations."},
+                    {"role": "user", "content": prompt}
+                ],
                 temperature=0.3,
-                max_tokens=1000
+                max_tokens=1500
             )
             
-            analysis = json.loads(response.choices[0].message.content)
+            # Parse response
+            content = response.choices[0].message.content.strip()
             
-            # Update keywords with LLM analysis
-            for kw in keywords:
-                if kw.keyword in analysis:
-                    kw.is_hot_topic = analysis[kw.keyword].get('hot', False)
-                    kw.llm_elaboration = analysis[kw.keyword].get('importance', '')
+            # Extract JSON from response (handle markdown code blocks)
+            json_match = re.search(r'\{[\s\S]*\}', content)
+            if json_match:
+                content = json_match.group(0)
             
-            logger.info(f"✅ LLM analyzed {len(kw_list)} keywords, identified {sum(1 for kw in keywords if kw.is_hot_topic)} hot topics")
+            result = json.loads(content)
             
+            # Convert to EnhancedKeywordResult objects
+            keywords = []
+            for kw_data in result.get('keywords', [])[:max_keywords]:
+                keywords.append(EnhancedKeywordResult(
+                    keyword=kw_data.get('keyword', ''),
+                    specificity_score=kw_data.get('specificity', 0.8),
+                    relevance_score=kw_data.get('relevance', 0.8),
+                    category=kw_data.get('category', 'Other'),
+                    is_hot_topic=False,  # Will be set by hot topic analysis
+                    llm_elaboration="",  # Will be filled by hot topic analysis
+                    confidence=kw_data.get('confidence', 0.85)
+                ))
+            
+            logger.info(f"✅ Extracted {len(keywords)} keywords via DeepSeek")
+            return keywords
+            
+        except json.JSONDecodeError as e:
+            logger.error(f"❌ Failed to parse DeepSeek response: {e}")
+            logger.debug(f"Raw response: {content[:500]}...")
+            return []
         except Exception as e:
-            logger.warning(f"⚠️  LLM hot topic analysis failed: {e}")
-        
-        return keywords
+            logger.error(f"❌ DeepSeek extraction failed: {e}")
+            return []
     
-    def generate_hot_topic_report(self, keywords: List[EnhancedKeywordResult]) -> str:
-        """Generate markdown report of hot topics"""
-        hot_topics = [kw for kw in keywords if kw.is_hot_topic]
+    def analyze_hot_topics(self, all_keywords: List[str], top_n: int = 50) -> Dict:
+        """
+        Analyze hot research directions across all collected keywords
         
-        if not hot_topics:
-            return "## 🔥 Hot Topics Analysis\n\nNo hot topics identified (enable LLM for analysis).\n"
+        Args:
+            all_keywords: List of all keywords from collected papers
+            top_n: Use top N most frequent keywords
         
-        report = ["## 🔥 Hot Topics Analysis\n"]
-        report.append(f"**{len(hot_topics)} emerging topics identified**\n")
+        Returns:
+            Dict with hot directions analysis
+        """
+        try:
+            # Get most frequent keywords
+            from collections import Counter
+            keyword_counts = Counter(all_keywords)
+            top_keywords = [kw for kw, count in keyword_counts.most_common(top_n)]
+            
+            # Prepare prompt
+            prompt = self.HOT_TOPIC_PROMPT.format(keywords=", ".join(top_keywords))
+            
+            # Call DeepSeek
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": "You are an AIVC research trend analyst. Output JSON only, no explanations."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.3,
+                max_tokens=2000
+            )
+            
+            # Parse response
+            content = response.choices[0].message.content.strip()
+            
+            # Extract JSON
+            json_match = re.search(r'\{[\s\S]*\}', content)
+            if json_match:
+                content = json_match.group(0)
+            
+            result = json.loads(content)
+            
+            logger.info(f"✅ DeepSeek identified {len(result.get('hot_directions', []))} hot research directions")
+            return result
+            
+        except json.JSONDecodeError as e:
+            logger.error(f"❌ Failed to parse hot topic analysis: {e}")
+            logger.debug(f"Raw response: {content[:500]}...")
+            return {"hot_directions": [], "overall_trends": "Analysis failed"}
+        except Exception as e:
+            logger.error(f"❌ Hot topic analysis failed: {e}")
+            return {"hot_directions": [], "overall_trends": f"Analysis failed: {e}"}
+    
+    def generate_research_trend_report(self, hot_topics: Dict) -> str:
+        """
+        Generate markdown report from hot topic analysis
         
-        for i, kw in enumerate(hot_topics[:5], 1):
-            report.append(f"### {i}. {kw.keyword}\n")
-            report.append(f"- **Category:** {kw.category}")
-            report.append(f"- **Specificity:** {kw.specificity_score:.2f}")
-            report.append(f"- **Relevance:** {kw.relevance_score:.2f}")
-            if kw.llm_elaboration:
-                report.append(f"- **Insight:** {kw.llm_elaboration}")
-            report.append("")
+        Args:
+            hot_topics: Result from analyze_hot_topics()
         
-        return '\n'.join(report)
+        Returns:
+            Markdown report string
+        """
+        lines = [
+            "# 🔥 AIVC Hot Research Directions",
+            "",
+            "*Analysis powered by DeepSeek LLM*",
+            "",
+            "## 📊 Overall Trends",
+            "",
+            hot_topics.get('overall_trends', 'No analysis available'),
+            "",
+            "---",
+            "",
+        ]
+        
+        directions = hot_topics.get('hot_directions', [])
+        if not directions:
+            lines.append("*No hot directions identified yet. Collect more papers and re-run analysis.*")
+        else:
+            lines.append(f"**{len(directions)} major research directions identified**")
+            lines.append("")
+            
+            for i, direction in enumerate(sorted(directions, key=lambda x: x.get('heat_score', 0), reverse=True), 1):
+                lines.extend([
+                    f"### {i}. {direction.get('direction_name', 'Unknown Direction')}",
+                    "",
+                    f"**Trend Stage:** {direction.get('trend_stage', 'unknown').replace('_', ' ').title()}",
+                    "",
+                    f"**Key Keywords:** {', '.join(direction.get('keywords', [])[:5])}",
+                    "",
+                    f"**Why It Matters:**",
+                    "",
+                    f"{direction.get('importance', 'N/A')}",
+                    "",
+                    f"**Future Opportunities:**",
+                    "",
+                    f"{direction.get('future_opportunities', 'N/A')}",
+                    "",
+                    f"**Heat Score:** {direction.get('heat_score', 0):.2f}/1.0",
+                    "",
+                    "---",
+                    "",
+                ])
+        
+        return "\n".join(lines)
 
 
-def create_enhanced_extractor(llm_config: Dict = None) -> EnhancedAIVCKeywordExtractor:
-    """Factory function to create enhanced extractor"""
-    return EnhancedAIVCKeywordExtractor(llm_config=llm_config)
+def create_deepseek_extractor(api_key: str, model: str = "deepseek-chat", base_url: str = "https://api.deepseek.com") -> DeepSeekAIVCExtractor:
+    """
+    Factory function to create DeepSeek extractor
+    
+    Args:
+        api_key: DeepSeek API key
+        model: Model name
+        base_url: API base URL
+    
+    Returns:
+        DeepSeekAIVCExtractor instance
+    """
+    return DeepSeekAIVCExtractor(api_key=api_key, model=model, base_url=base_url)

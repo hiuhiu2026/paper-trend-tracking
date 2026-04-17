@@ -29,15 +29,13 @@ if str(src_path) not in sys.path:
 
 try:
     from .data_collector import DataCollector, Paper
-    from .keyword_extractor import create_extractor
-    from .enhanced_keyword_extractor import create_enhanced_extractor
+    from .enhanced_keyword_extractor import create_deepseek_extractor
     from .network_builder import NetworkBuilder, TrendAnalyzer
     from .visualization import NetworkVisualizer, TrendDashboard
     from .database import DatabaseManager, PaperModel, KeywordModel
 except ImportError:
     from data_collector import DataCollector, Paper
-    from keyword_extractor import create_extractor
-    from enhanced_keyword_extractor import create_enhanced_extractor
+    from enhanced_keyword_extractor import create_deepseek_extractor
     from network_builder import NetworkBuilder, TrendAnalyzer
     from visualization import NetworkVisualizer, TrendDashboard
     from database import DatabaseManager, PaperModel, KeywordModel
@@ -47,7 +45,7 @@ except ImportError:
 # Configuration - Virtual Cell Domain
 # ============================================================================
 
-# Search queries for Virtual Cell & AI Virtual Cell (EXPANDED)
+# Search queries for Virtual Cell & AI Virtual Cell
 VIRTUAL_CELL_QUERIES = [
     # Core Virtual Cell concepts
     "virtual cell modeling",
@@ -55,8 +53,6 @@ VIRTUAL_CELL_QUERIES = [
     "computational cell model",
     "whole cell simulation",
     "cell-scale modeling",
-    "in silico cell",
-    "virtual cell platform",
     
     # AI + Virtual Cell
     "AI virtual cell",
@@ -64,37 +60,18 @@ VIRTUAL_CELL_QUERIES = [
     "deep learning cell simulation",
     "neural network cell modeling",
     "foundation model cell biology",
-    "large language model cell",
-    "transformer cell model",
-    "generative AI cell",
     
     # Systems Biology + Modeling
     "systems biology modeling",
     "multiscale cell model",
     "integrative cell modeling",
     "mechanistic cell model",
-    "constraint-based cell model",
-    "metabolic cell model",
     
     # Specific approaches
     "agent-based cell model",
     "ODE cell modeling",
     "spatial cell simulation",
     "stochastic cell model",
-    "Boolean network cell",
-    "Petri net cell",
-    
-    # Omics + Cell
-    "single cell modeling",
-    "spatial transcriptomics modeling",
-    "multi-omics cell integration",
-    "scRNA-seq computational model",
-    
-    # Applications
-    "drug response cell model",
-    "cancer cell simulation",
-    "personalized medicine cell",
-    "cell therapy modeling",
 ]
 
 # Domain-specific keywords for filtering
@@ -132,13 +109,20 @@ DOMAIN_KEYWORDS = {
     ],
 }
 
-# Top journals in the field
+# Top journals in the field (updated April 2026 for AIVC research)
 TOP_JOURNALS = [
-    "Cell", "Nature", "Science",
-    "Cell Systems", "Nature Methods", "Nature Biotechnology",
-    "PLOS Computational Biology", "Bioinformatics",
+    # Tier 1: Premier (IF 20+)
+    "Cell", "Nature", "Nature Methods", "Nature Biotechnology",
+    # Tier 2: High-Impact (IF 10-20)
+    "Nature Digital Medicine", "Nature Communications",
+    "Briefings in Bioinformatics", "PNAS", "Science Advances",
+    "The Innovation",
+    # Tier 3: Specialized (IF 5-10)
+    "PLOS Computational Biology", "ACS Biomaterials",
+    "Advanced Science", "Stem Cell", "International Journal of Molecular",
+    "iScience", "Bioinformatics", "Cell Systems",
     "Cell Reports", "Molecular Systems Biology",
-    "Journal of Cell Biology", "Developmental Cell",
+    # Preprint servers
     "BioRxiv", "arXiv"
 ]
 
@@ -182,13 +166,34 @@ class VirtualCellTracker:
             use_semantic_scholar=False
         )
         
-        # Use enhanced keyword extractor with LLM config for hot topic analysis
+        # Initialize DeepSeek extractor (LLM-only, no pattern matching)
         llm_config = self.config.get('llm', {})
-        self.extractor = create_enhanced_extractor(llm_config=llm_config)
+        self.extractor = None
+        self.deepseek_enabled = False
         
-        # LLM for summarization (optional, separate from hot topic analysis)
+        if llm_config.get('enabled') and llm_config.get('provider') == 'deepseek':
+            api_key = llm_config.get('api_key')
+            if api_key and api_key != 'YOUR_API_KEY_HERE':
+                try:
+                    self.extractor = create_deepseek_extractor(
+                        api_key=api_key,
+                        model=llm_config.get('model', 'deepseek-chat'),
+                        base_url=llm_config.get('base_url', 'https://api.deepseek.com')
+                    )
+                    self.deepseek_enabled = True
+                    logger.info("✅ DeepSeek-powered keyword extraction enabled")
+                except Exception as e:
+                    logger.warning(f"⚠️  Failed to initialize DeepSeek: {e}. Falling back to pattern matching.")
+        
+        if not self.extractor:
+            # Fallback to basic keyword extractor if DeepSeek not available
+            from .keyword_extractor import create_extractor as create_basic_extractor
+            self.extractor = create_basic_extractor('yake', config={'num_keywords': 10})
+            logger.warning("⚠️  Using basic keyword extraction (enable DeepSeek for better results)")
+        
+        # LLM for summarization (separate from keyword extraction)
         self.llm_enabled = False
-        if llm_config.get('enabled', False) and llm_config.get('api_key') and llm_config.get('api_key') != 'YOUR_API_KEY_HERE':
+        if llm_config.get('enabled') and llm_config.get('api_key') and llm_config.get('api_key') != 'YOUR_API_KEY_HERE':
             self._init_llm()
         
         logger.info("Virtual Cell Tracker initialized")
@@ -201,25 +206,17 @@ class VirtualCellTracker:
         return {}
     
     def _init_llm(self):
-        """Initialize LLM for summarization (supports OpenAI and DeepSeek)"""
+        """Initialize LLM for summarization"""
         try:
             from openai import OpenAI
             
-            llm_config = self.config.get('llm', {})
-            api_key = llm_config.get('api_key')
-            provider = llm_config.get('provider', 'openai')
-            
-            if api_key and api_key != 'YOUR_API_KEY_HERE':
-                if provider == 'deepseek':
-                    base_url = llm_config.get('base_url', 'https://api.deepseek.com')
-                    self.llm_client = OpenAI(api_key=api_key, base_url=base_url)
-                    logger.info(f"✅ DeepSeek LLM summarization enabled (model: {llm_config.get('model', 'deepseek-chat')})")
-                else:
-                    self.llm_client = OpenAI(api_key=api_key)
-                    logger.info(f"✅ OpenAI LLM summarization enabled (model: {llm_config.get('model', 'gpt-4o-mini')})")
+            api_key = self.config.get('llm', {}).get('api_key')
+            if api_key:
+                self.llm_client = OpenAI(api_key=api_key)
                 self.llm_enabled = True
+                logger.info("LLM summarization enabled")
             else:
-                logger.warning("⚠️  LLM API key not configured or is placeholder")
+                logger.warning("LLM API key not configured")
         except ImportError:
             logger.warning("OpenAI not installed. LLM summarization disabled.")
     
@@ -298,11 +295,8 @@ Please output in the following format (in Chinese):
 
 Keep it concise and professional."""
 
-            llm_config = self.config.get('llm', {})
-            model = llm_config.get('model', 'deepseek-chat' if llm_config.get('provider') == 'deepseek' else 'gpt-4o-mini')
-            
             response = self.llm_client.chat.completions.create(
-                model=model,
+                model="gpt-4o-mini",
                 messages=[
                     {"role": "system", "content": "You are a research assistant specializing in computational biology and virtual cell modeling."},
                     {"role": "user", "content": prompt}
@@ -529,9 +523,19 @@ Keep it concise and professional."""
                 # If no keywords from source, extract from title/abstract
                 if not keywords_to_add and (paper.title or paper.abstract):
                     try:
-                        text = f"{paper.title}. {paper.abstract}"
-                        extracted = self.extractor.extract(text, max_keywords=10)
-                        keywords_to_add = [kw.keyword for kw in extracted]
+                        if self.deepseek_enabled and hasattr(self.extractor, 'extract_keywords'):
+                            # Use DeepSeek LLM extraction (title and abstract separate)
+                            extracted = self.extractor.extract_keywords(
+                                title=paper.title or "",
+                                abstract=paper.abstract or "",
+                                max_keywords=10
+                            )
+                            keywords_to_add = [kw.keyword for kw in extracted]
+                        else:
+                            # Fallback to basic extraction
+                            text = f"{paper.title}. {paper.abstract}"
+                            extracted = self.extractor.extract(text, max_keywords=10)
+                            keywords_to_add = [kw.keyword for kw in extracted]
                         logger.debug(f"Extracted {len(keywords_to_add)} keywords for {paper.id}")
                     except Exception as e:
                         logger.debug(f"Keyword extraction failed for {paper.id}: {e}")
@@ -588,17 +592,15 @@ Keep it concise and professional."""
         finally:
             session.close()
         
-        # Build network with MONTHLY snapshots for the last 2-3 YEARS
+        # Build network
         builder = NetworkBuilder(db, min_cooccurrence=2)
         
         from datetime import timedelta
-        # Use last 730 days (2 years) for better trend analysis
-        from_date = dt.utcnow() - timedelta(days=730)
+        from_date = dt.utcnow() - timedelta(days=30)
         
-        # Build monthly snapshots for trend visualization
         snapshots = builder.build_snapshots(
             from_date=from_date,
-            time_window='month',  # Monthly snapshots
+            time_window=time_window,
             overwrite=True
         )
         
@@ -606,15 +608,7 @@ Keep it concise and professional."""
             logger.warning("No snapshots built (not enough data)")
             return None, None, None
         
-        logger.info(f"Built {len(snapshots)} MONTHLY network snapshots (last 730 days)")
-        
-        # FORCE trend visualization even with limited snapshots
-        # This ensures charts are always generated
-        if len(snapshots) < 3:
-            logger.info(f"⚠️  Only {len(snapshots)} snapshots - generating trend charts with available data")
-            # Duplicate latest snapshot to create minimum 3 points for visualization
-            while len(snapshots) < 3:
-                snapshots.append(snapshots[-1])
+        logger.info(f"Built {len(snapshots)} network snapshots")
         
         # Analyze trends
         analyzer = TrendAnalyzer(db)
@@ -651,7 +645,33 @@ Keep it concise and professional."""
             except Exception as e:
                 logger.error(f"Error generating trend charts: {e}")
         
-        return snapshots, trends, visualizer
+        # DeepSeek Hot Topic Analysis (if enabled)
+        hot_topic_report = None
+        if self.deepseek_enabled and hasattr(self.extractor, 'analyze_hot_topics'):
+            try:
+                logger.info("\n🔥 Running DeepSeek hot topic analysis...")
+                # Get all keywords from database
+                all_keywords = session.query(KeywordModel.name).all()
+                all_keywords = [kw[0] for kw in all_keywords]
+                
+                # Analyze hot research directions
+                hot_topics = self.extractor.analyze_hot_topics(all_keywords, top_n=50)
+                
+                # Generate markdown report
+                hot_topic_report = self.extractor.generate_research_trend_report(hot_topics)
+                
+                # Save hot topic report
+                hot_topic_file = self.output_dir / "hot_topics.md"
+                with open(hot_topic_file, 'w', encoding='utf-8') as f:
+                    f.write(hot_topic_report)
+                logger.info(f"✅ Hot topic report saved: {hot_topic_file}")
+                
+            except Exception as e:
+                logger.error(f"Hot topic analysis failed: {e}")
+                import traceback
+                traceback.print_exc()
+        
+        return snapshots, trends, visualizer, hot_topic_report
     
     def run(self, days_back: int = 3, max_per_query: int = 50, output_file: str = None, 
             build_network: bool = True, time_window: str = 'week'):
@@ -706,14 +726,20 @@ Keep it concise and professional."""
             logger.info("  BUILDING NETWORK & TRENDS")
             logger.info("=" * 70)
             
-            snapshots, trends, visualizer = self.build_network_and_trends(
-                papers, time_window=time_window
-            )
+            result = self.build_network_and_trends(papers, time_window=time_window)
+            snapshots, trends, visualizer, hot_topic_report = result
             
             if snapshots and trends:
                 logger.info(f"✅ Network built: {len(snapshots)} snapshots")
                 logger.info(f"✅ Trends analyzed: {len(trends)} trending keywords")
                 logger.info(f"📈 Visualizations saved to: {self.output_dir / 'vc_visualizations'}")
+                
+                # Add hot topic report to main report if available
+                if hot_topic_report:
+                    with open(output_file, 'a', encoding='utf-8') as f:
+                        f.write("\n\n")
+                        f.write(hot_topic_report)
+                    logger.info(f"🔥 Hot topic analysis added to report")
                 
                 # Add network info to report
                 network_info = []
